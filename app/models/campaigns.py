@@ -20,7 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, GUID, Money, Timestamped, UUIDPk
+from app.db.base import Base, GUID, Money, StrEnumType, Timestamped, UUIDPk
 from app.models.enums import (
     AdStatus,
     CampaignStatus,
@@ -39,14 +39,14 @@ class Campaign(UUIDPk, Timestamped, Base):
         GUID, ForeignKey("advertisers.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    campaign_type: Mapped[CampaignType] = mapped_column(String(24), nullable=False)
+    campaign_type: Mapped[CampaignType] = mapped_column(StrEnumType(CampaignType, 24), nullable=False)
     pricing_model: Mapped[PricingModel] = mapped_column(
-        String(8), default=PricingModel.CPM, nullable=False
+        StrEnumType(PricingModel, 8), default=PricingModel.CPM, nullable=False
     )
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
 
     status: Mapped[CampaignStatus] = mapped_column(
-        String(16), default=CampaignStatus.DRAFT, nullable=False, index=True
+        StrEnumType(CampaignStatus, 16), default=CampaignStatus.DRAFT, nullable=False, index=True
     )
 
     total_budget: Mapped[object] = mapped_column(Money, nullable=False)
@@ -129,9 +129,9 @@ class Advertisement(UUIDPk, Timestamped, Base):
         GUID, ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True
     )
     status: Mapped[AdStatus] = mapped_column(
-        String(16), default=AdStatus.DRAFT, nullable=False, index=True
+        StrEnumType(AdStatus, 16), default=AdStatus.DRAFT, nullable=False, index=True
     )
-    ad_format: Mapped[CampaignType] = mapped_column(String(24), nullable=False)
+    ad_format: Mapped[CampaignType] = mapped_column(StrEnumType(CampaignType, 24), nullable=False)
 
     body_text: Mapped[str | None] = mapped_column(Text)
     # Telegram file_id: opaque, bot-scoped. We keep the original URL separately

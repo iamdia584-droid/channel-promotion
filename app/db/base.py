@@ -34,6 +34,37 @@ class JSONBType(TypeDecorator):
         return dialect.type_descriptor(JSON())
 
 
+class StrEnumType(TypeDecorator):
+    """A ``StrEnum`` column that round-trips as the enum, not as ``str``.
+
+    Declaring ``Mapped[SomeEnum]`` against a plain ``String`` stores fine but
+    reads back a bare ``str``, which makes every ``is`` comparison against an
+    enum member silently false — and a sign test like
+    ``leg.direction is account.normal_side`` then flips the sign of a ledger
+    entry. Converting in the type is the only place that cannot be forgotten.
+    It also validates on write, so an unknown status can never be persisted.
+    """
+
+    impl = String
+    cache_ok = True
+
+    def __init__(self, enum_class, length: int = 32) -> None:
+        self.enum_class = enum_class
+        super().__init__(length=length)
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, self.enum_class):
+            return value.value
+        return self.enum_class(str(value)).value  # raises ValueError on a bad value
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return self.enum_class(value)
+
+
 class GUID(TypeDecorator):
     """UUID on Postgres, 36-char string elsewhere."""
 

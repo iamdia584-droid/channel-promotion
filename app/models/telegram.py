@@ -20,7 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, GUID, Money, TelegramId, Timestamped, UUIDPk
+from app.db.base import Base, GUID, Money, StrEnumType, TelegramId, Timestamped, UUIDPk
 from app.models.enums import ChannelStatus, ChatType, MeasurementMode, VerificationStatus
 
 if TYPE_CHECKING:
@@ -40,7 +40,7 @@ class TelegramChat(UUIDPk, Timestamped, Base):
     telegram_chat_id: Mapped[int] = mapped_column(
         TelegramId, unique=True, nullable=False, index=True
     )
-    chat_type: Mapped[ChatType] = mapped_column(String(16), nullable=False)
+    chat_type: Mapped[ChatType] = mapped_column(StrEnumType(ChatType, 16), nullable=False)
     username: Mapped[str | None] = mapped_column(String(64), index=True)
     title: Mapped[str | None] = mapped_column(String(300))
     description: Mapped[str | None] = mapped_column(String(1000))
@@ -83,17 +83,17 @@ class PublisherChannel(UUIDPk, Timestamped, Base):
     accepted_categories: Mapped[dict] = mapped_column(default=dict, nullable=False)
 
     status: Mapped[ChannelStatus] = mapped_column(
-        String(16), default=ChannelStatus.PENDING, nullable=False, index=True
+        StrEnumType(ChannelStatus, 16), default=ChannelStatus.PENDING, nullable=False, index=True
     )
     verification_status: Mapped[VerificationStatus] = mapped_column(
-        String(24), default=VerificationStatus.UNVERIFIED, nullable=False
+        StrEnumType(VerificationStatus, 24), default=VerificationStatus.UNVERIFIED, nullable=False
     )
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     verification_evidence: Mapped[dict] = mapped_column(default=dict, nullable=False)
     rejection_reason: Mapped[str | None] = mapped_column(String(500))
 
     measurement_mode: Mapped[MeasurementMode] = mapped_column(
-        String(16), default=MeasurementMode.CLICK_ONLY, nullable=False
+        StrEnumType(MeasurementMode, 16), default=MeasurementMode.CLICK_ONLY, nullable=False
     )
 
     # Observed performance. avg_views — not member_count — is the billing basis.
@@ -184,5 +184,5 @@ class ChannelVerificationAttempt(UUIDPk, Timestamped, Base):
     )
     submitted_identifier: Mapped[str] = mapped_column(String(300), nullable=False)
     telegram_chat_id: Mapped[int | None] = mapped_column(TelegramId)
-    result: Mapped[VerificationStatus] = mapped_column(String(24), nullable=False)
+    result: Mapped[VerificationStatus] = mapped_column(StrEnumType(VerificationStatus, 24), nullable=False)
     evidence: Mapped[dict] = mapped_column(default=dict, nullable=False)

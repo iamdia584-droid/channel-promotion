@@ -22,7 +22,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, GUID, Money, TelegramId, Timestamped, UUIDPk
+from app.db.base import Base, GUID, Money, StrEnumType, TelegramId, Timestamped, UUIDPk
 from app.models.enums import Role, UserStatus
 
 if TYPE_CHECKING:
@@ -50,7 +50,7 @@ class User(UUIDPk, Timestamped, Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     status: Mapped[UserStatus] = mapped_column(
-        String(16), default=UserStatus.ACTIVE, nullable=False, index=True
+        StrEnumType(UserStatus, 16), default=UserStatus.ACTIVE, nullable=False, index=True
     )
     suspension_reason: Mapped[str | None] = mapped_column(String(500))
     suspended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -107,7 +107,7 @@ class Advertiser(UUIDPk, Timestamped, Base):
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
 
     status: Mapped[UserStatus] = mapped_column(
-        String(16), default=UserStatus.ACTIVE, nullable=False, index=True
+        StrEnumType(UserStatus, 16), default=UserStatus.ACTIVE, nullable=False, index=True
     )
     trust_tier: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     lifetime_deposited: Mapped[object] = mapped_column(Money, default="0", nullable=False)
@@ -139,7 +139,7 @@ class Publisher(UUIDPk, Timestamped, Base):
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
 
     status: Mapped[UserStatus] = mapped_column(
-        String(16), default=UserStatus.ACTIVE, nullable=False, index=True
+        StrEnumType(UserStatus, 16), default=UserStatus.ACTIVE, nullable=False, index=True
     )
     auto_advertising: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     accepted_categories: Mapped[dict] = mapped_column(default=dict, nullable=False)
@@ -179,7 +179,7 @@ class StaffUser(UUIDPk, Timestamped, Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str | None] = mapped_column(String(200))
-    role: Mapped[Role] = mapped_column(String(16), nullable=False)
+    role: Mapped[Role] = mapped_column(StrEnumType(Role, 16), nullable=False)
 
     telegram_user_id: Mapped[int | None] = mapped_column(TelegramId, unique=True)
     totp_secret: Mapped[str | None] = mapped_column(String(64))

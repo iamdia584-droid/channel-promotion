@@ -27,7 +27,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, GUID, Money, Timestamped, UUIDPk
+from app.db.base import Base, GUID, Money, StrEnumType, Timestamped, UUIDPk
 from app.models.enums import (
     AccountKind,
     AccountOwnerType,
@@ -60,11 +60,11 @@ class LedgerAccount(UUIDPk, Timestamped, Base):
 
     __tablename__ = "ledger_accounts"
 
-    owner_type: Mapped[AccountOwnerType] = mapped_column(String(16), nullable=False)
+    owner_type: Mapped[AccountOwnerType] = mapped_column(StrEnumType(AccountOwnerType, 16), nullable=False)
     owner_id: Mapped[uuid.UUID | None] = mapped_column(GUID)  # NULL for platform accounts
-    kind: Mapped[AccountKind] = mapped_column(String(32), nullable=False)
+    kind: Mapped[AccountKind] = mapped_column(StrEnumType(AccountKind, 32), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
-    normal_side: Mapped[EntryDirection] = mapped_column(String(8), nullable=False)
+    normal_side: Mapped[EntryDirection] = mapped_column(StrEnumType(EntryDirection, 8), nullable=False)
     balance: Mapped[object] = mapped_column(Money, default="0", nullable=False)
     label: Mapped[str | None] = mapped_column(String(120))
 
@@ -93,10 +93,10 @@ class LedgerTransaction(UUIDPk, Base):
     __tablename__ = "ledger_transactions"
 
     transaction_type: Mapped[TransactionType] = mapped_column(
-        String(32), nullable=False, index=True
+        StrEnumType(TransactionType, 32), nullable=False, index=True
     )
     status: Mapped[TransactionStatus] = mapped_column(
-        String(16), default=TransactionStatus.POSTED, nullable=False
+        StrEnumType(TransactionStatus, 16), default=TransactionStatus.POSTED, nullable=False
     )
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     amount: Mapped[object] = mapped_column(Money, nullable=False)  # the movement's magnitude
@@ -146,7 +146,7 @@ class LedgerEntry(UUIDPk, Base):
     account_id: Mapped[uuid.UUID] = mapped_column(
         GUID, ForeignKey("ledger_accounts.id", ondelete="RESTRICT"), nullable=False, index=True
     )
-    direction: Mapped[EntryDirection] = mapped_column(String(8), nullable=False)
+    direction: Mapped[EntryDirection] = mapped_column(StrEnumType(EntryDirection, 8), nullable=False)
     amount: Mapped[object] = mapped_column(Money, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     balance_after: Mapped[object] = mapped_column(Money, nullable=False)
@@ -227,7 +227,7 @@ class WalletTransaction(UUIDPk, Base):
     ledger_transaction_id: Mapped[uuid.UUID] = mapped_column(
         GUID, ForeignKey("ledger_transactions.id", ondelete="RESTRICT"), nullable=False
     )
-    transaction_type: Mapped[TransactionType] = mapped_column(String(32), nullable=False)
+    transaction_type: Mapped[TransactionType] = mapped_column(StrEnumType(TransactionType, 32), nullable=False)
     # Signed from the user's point of view: +credit to them, -debit from them.
     signed_amount: Mapped[object] = mapped_column(Money, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
@@ -261,7 +261,7 @@ class PublisherEarning(UUIDPk, Base):
     settlement_batch_id: Mapped[uuid.UUID] = mapped_column(GUID, nullable=False, index=True)
 
     status: Mapped[EarningStatus] = mapped_column(
-        String(16), default=EarningStatus.PENDING, nullable=False, index=True
+        StrEnumType(EarningStatus, 16), default=EarningStatus.PENDING, nullable=False, index=True
     )
     billable_impressions: Mapped[int] = mapped_column(Integer, nullable=False)
     publisher_cpm: Mapped[object] = mapped_column(Money, nullable=False)
@@ -308,7 +308,7 @@ class Deposit(UUIDPk, Timestamped, Base):
         GUID, ForeignKey("advertisers.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     status: Mapped[DepositStatus] = mapped_column(
-        String(16), default=DepositStatus.INITIATED, nullable=False, index=True
+        StrEnumType(DepositStatus, 16), default=DepositStatus.INITIATED, nullable=False, index=True
     )
     amount: Mapped[object] = mapped_column(Money, nullable=False)
     fee: Mapped[object] = mapped_column(Money, default="0", nullable=False)
@@ -352,7 +352,7 @@ class PayoutMethodRecord(UUIDPk, Timestamped, Base):
     publisher_id: Mapped[uuid.UUID] = mapped_column(
         GUID, ForeignKey("publishers.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    method: Mapped[PayoutMethod] = mapped_column(String(16), nullable=False)
+    method: Mapped[PayoutMethod] = mapped_column(StrEnumType(PayoutMethod, 16), nullable=False)
     label: Mapped[str | None] = mapped_column(String(64))
     account_name: Mapped[str | None] = mapped_column(String(120))
     destination_masked: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -384,14 +384,14 @@ class Withdrawal(UUIDPk, Timestamped, Base):
         GUID, ForeignKey("payout_methods.id", ondelete="RESTRICT")
     )
     status: Mapped[WithdrawalStatus] = mapped_column(
-        String(16), default=WithdrawalStatus.PENDING, nullable=False, index=True
+        StrEnumType(WithdrawalStatus, 16), default=WithdrawalStatus.PENDING, nullable=False, index=True
     )
     amount: Mapped[object] = mapped_column(Money, nullable=False)
     fee: Mapped[object] = mapped_column(Money, default="0", nullable=False)
     net_amount: Mapped[object] = mapped_column(Money, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
 
-    method: Mapped[PayoutMethod] = mapped_column(String(16), nullable=False)
+    method: Mapped[PayoutMethod] = mapped_column(StrEnumType(PayoutMethod, 16), nullable=False)
     destination_masked: Mapped[str] = mapped_column(String(64), nullable=False)
 
     request_transaction_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -434,7 +434,7 @@ class Refund(UUIDPk, Timestamped, Base):
         GUID, ForeignKey("campaigns.id", ondelete="SET NULL"), index=True
     )
     status: Mapped[RefundStatus] = mapped_column(
-        String(16), default=RefundStatus.REQUESTED, nullable=False, index=True
+        StrEnumType(RefundStatus, 16), default=RefundStatus.REQUESTED, nullable=False, index=True
     )
     requested_amount: Mapped[object] = mapped_column(Money, nullable=False)
     approved_amount: Mapped[object] = mapped_column(Money, default="0", nullable=False)

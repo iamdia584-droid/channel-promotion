@@ -20,7 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, GUID, Money, TelegramId, Timestamped, UUIDPk
+from app.db.base import Base, GUID, Money, StrEnumType, TelegramId, Timestamped, UUIDPk
 from app.models.enums import (
     FraudBand,
     FraudCaseStatus,
@@ -46,7 +46,7 @@ class FraudEvent(UUIDPk, Base):
 
     __tablename__ = "fraud_events"
 
-    subject_type: Mapped[FraudSubject] = mapped_column(String(16), nullable=False, index=True)
+    subject_type: Mapped[FraudSubject] = mapped_column(StrEnumType(FraudSubject, 16), nullable=False, index=True)
     subject_id: Mapped[uuid.UUID | None] = mapped_column(GUID, index=True)
     publisher_id: Mapped[uuid.UUID | None] = mapped_column(GUID, index=True)
     advertiser_id: Mapped[uuid.UUID | None] = mapped_column(GUID, index=True)
@@ -56,7 +56,7 @@ class FraudEvent(UUIDPk, Base):
 
     signal: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     score: Mapped[int] = mapped_column(Integer, nullable=False)
-    band: Mapped[FraudBand] = mapped_column(String(16), nullable=False, index=True)
+    band: Mapped[FraudBand] = mapped_column(StrEnumType(FraudBand, 16), nullable=False, index=True)
     # Never a bare verdict: the admin must be able to inspect why (spec §16).
     evidence: Mapped[dict] = mapped_column(default=dict, nullable=False)
     action_taken: Mapped[str | None] = mapped_column(String(64))
@@ -76,10 +76,10 @@ class FraudScore(UUIDPk, Timestamped, Base):
 
     __tablename__ = "fraud_scores"
 
-    subject_type: Mapped[FraudSubject] = mapped_column(String(16), nullable=False)
+    subject_type: Mapped[FraudSubject] = mapped_column(StrEnumType(FraudSubject, 16), nullable=False)
     subject_id: Mapped[uuid.UUID] = mapped_column(GUID, nullable=False)
     score: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
-    band: Mapped[FraudBand] = mapped_column(String(16), nullable=False)
+    band: Mapped[FraudBand] = mapped_column(StrEnumType(FraudBand, 16), nullable=False)
     signals: Mapped[dict] = mapped_column(default=dict, nullable=False)
     events_counted: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_event_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -95,13 +95,13 @@ class FraudCase(UUIDPk, Timestamped, Base):
 
     __tablename__ = "fraud_cases"
 
-    subject_type: Mapped[FraudSubject] = mapped_column(String(16), nullable=False)
+    subject_type: Mapped[FraudSubject] = mapped_column(StrEnumType(FraudSubject, 16), nullable=False)
     subject_id: Mapped[uuid.UUID] = mapped_column(GUID, nullable=False, index=True)
     status: Mapped[FraudCaseStatus] = mapped_column(
-        String(16), default=FraudCaseStatus.OPEN, nullable=False, index=True
+        StrEnumType(FraudCaseStatus, 16), default=FraudCaseStatus.OPEN, nullable=False, index=True
     )
     score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    band: Mapped[FraudBand] = mapped_column(String(16), nullable=False)
+    band: Mapped[FraudBand] = mapped_column(StrEnumType(FraudBand, 16), nullable=False)
     summary: Mapped[str | None] = mapped_column(String(500))
     evidence: Mapped[dict] = mapped_column(default=dict, nullable=False)
     amount_held: Mapped[object] = mapped_column(Money, default="0", nullable=False)
@@ -123,10 +123,10 @@ class ModerationReview(UUIDPk, Timestamped, Base):
 
     __tablename__ = "moderation_reviews"
 
-    target_type: Mapped[ReviewTarget] = mapped_column(String(16), nullable=False, index=True)
+    target_type: Mapped[ReviewTarget] = mapped_column(StrEnumType(ReviewTarget, 16), nullable=False, index=True)
     target_id: Mapped[uuid.UUID] = mapped_column(GUID, nullable=False, index=True)
     decision: Mapped[ReviewDecision] = mapped_column(
-        String(16), default=ReviewDecision.PENDING, nullable=False, index=True
+        StrEnumType(ReviewDecision, 16), default=ReviewDecision.PENDING, nullable=False, index=True
     )
     staff_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID, ForeignKey("staff_users.id", ondelete="SET NULL")
@@ -153,13 +153,13 @@ class Report(UUIDPk, Timestamped, Base):
         GUID, ForeignKey("users.id", ondelete="SET NULL")
     )
     reporter_telegram_id: Mapped[int | None] = mapped_column(TelegramId)
-    target_type: Mapped[ReviewTarget] = mapped_column(String(16), nullable=False)
+    target_type: Mapped[ReviewTarget] = mapped_column(StrEnumType(ReviewTarget, 16), nullable=False)
     target_id: Mapped[uuid.UUID] = mapped_column(GUID, nullable=False, index=True)
     delivery_id: Mapped[uuid.UUID | None] = mapped_column(GUID)
-    reason: Mapped[ReportReason] = mapped_column(String(16), nullable=False, index=True)
+    reason: Mapped[ReportReason] = mapped_column(StrEnumType(ReportReason, 16), nullable=False, index=True)
     details: Mapped[str | None] = mapped_column(Text)
     status: Mapped[ReportStatus] = mapped_column(
-        String(16), default=ReportStatus.OPEN, nullable=False, index=True
+        StrEnumType(ReportStatus, 16), default=ReportStatus.OPEN, nullable=False, index=True
     )
     resolution: Mapped[str | None] = mapped_column(String(500))
     handled_by_staff_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -260,13 +260,13 @@ class Notification(UUIDPk, Base):
         GUID, ForeignKey("staff_users.id", ondelete="CASCADE")
     )
     channel: Mapped[NotificationChannel] = mapped_column(
-        String(16), default=NotificationChannel.TELEGRAM, nullable=False
+        StrEnumType(NotificationChannel, 16), default=NotificationChannel.TELEGRAM, nullable=False
     )
     template: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     payload: Mapped[dict] = mapped_column(default=dict, nullable=False)
     rendered_text: Mapped[str | None] = mapped_column(Text)
     status: Mapped[NotificationStatus] = mapped_column(
-        String(16), default=NotificationStatus.QUEUED, nullable=False, index=True
+        StrEnumType(NotificationStatus, 16), default=NotificationStatus.QUEUED, nullable=False, index=True
     )
     dedupe_key: Mapped[str | None] = mapped_column(String(160))
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -294,7 +294,7 @@ class SystemSetting(UUIDPk, Timestamped, Base):
 
     key: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
     value: Mapped[str] = mapped_column(Text, nullable=False)
-    value_type: Mapped[SettingType] = mapped_column(String(16), nullable=False)
+    value_type: Mapped[SettingType] = mapped_column(StrEnumType(SettingType, 16), nullable=False)
     category: Mapped[str] = mapped_column(String(32), default="general", nullable=False)
     description: Mapped[str | None] = mapped_column(String(500))
     min_value: Mapped[str | None] = mapped_column(String(64))
@@ -314,7 +314,7 @@ class PricingRule(UUIDPk, Timestamped, Base):
 
     __tablename__ = "pricing_rules"
 
-    scope: Mapped[PricingRuleScope] = mapped_column(String(24), nullable=False, index=True)
+    scope: Mapped[PricingRuleScope] = mapped_column(StrEnumType(PricingRuleScope, 24), nullable=False, index=True)
     scope_value: Mapped[str] = mapped_column(String(48), nullable=False)
     multiplier: Mapped[Decimal] = mapped_column(
         Numeric(8, 4), default=Decimal("1.0000"), nullable=False
