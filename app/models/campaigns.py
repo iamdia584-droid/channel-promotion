@@ -20,7 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, GUID, Money, StrEnumType, Timestamped, UUIDPk
+from app.db.base import Base, GUID, Money, StrEnumType, Timestamped, UTCDateTime, UUIDPk
 from app.models.enums import (
     AdStatus,
     CampaignStatus,
@@ -63,8 +63,8 @@ class Campaign(UUIDPk, Timestamped, Base):
     estimated_impressions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     clicks: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    starts_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    ends_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     priority: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
 
     # Frequency capping (spec §18). Per-user capping only binds on users who
@@ -76,8 +76,8 @@ class Campaign(UUIDPk, Timestamped, Base):
         Boolean, default=False, nullable=False
     )
     paused_reason: Mapped[str | None] = mapped_column(String(300))
-    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    approved_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     meta: Mapped[dict] = mapped_column(default=dict, nullable=False)
 
     advertiser: Mapped["Advertiser"] = relationship()
@@ -145,7 +145,7 @@ class Advertisement(UUIDPk, Timestamped, Base):
     disable_preview: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     rejection_reason: Mapped[str | None] = mapped_column(String(500))
-    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     reviewed_by: Mapped[uuid.UUID | None] = mapped_column(
         GUID, ForeignKey("staff_users.id", ondelete="SET NULL")
     )

@@ -26,7 +26,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, GUID, Money, StrEnumType, TelegramId, Timestamped, UUIDPk
+from app.db.base import Base, GUID, Money, StrEnumType, TelegramId, Timestamped, UTCDateTime, UUIDPk
 from app.models.enums import (
     DeliveryStatus,
     ImpressionKind,
@@ -99,12 +99,12 @@ class AdDelivery(UUIDPk, Timestamped, Base):
     impression_cap: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     tracking_nonce: Mapped[str] = mapped_column(String(64), nullable=False)
-    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), index=True)
     measurement_ends_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), index=True
+        UTCDateTime(), index=True
     )
-    settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    settled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    removed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     failure_reason: Mapped[str | None] = mapped_column(String(500))
     fraud_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
@@ -174,9 +174,9 @@ class Impression(UUIDPk, Base):
     # enforced by the database, not by an application check that a race can lose.
     dedupe_key: Mapped[str] = mapped_column(String(128), nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+        UTCDateTime(), nullable=False, index=True
     )
-    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     ip_hash: Mapped[str | None] = mapped_column(String(64), index=True)
     user_agent_hash: Mapped[str | None] = mapped_column(String(64))
     meta: Mapped[dict] = mapped_column(default=dict, nullable=False)
@@ -223,7 +223,7 @@ class Click(UUIDPk, Base):
     user_agent_hash: Mapped[str | None] = mapped_column(String(64))
     referrer: Mapped[str | None] = mapped_column(Text)
     occurred_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+        UTCDateTime(), nullable=False, index=True
     )
     meta: Mapped[dict] = mapped_column(default=dict, nullable=False)
 
@@ -248,7 +248,7 @@ class ConversionEvent(UUIDPk, Base):
     value: Mapped[object] = mapped_column(Money, default="0", nullable=False)
     currency: Mapped[str | None] = mapped_column(String(3))
     external_id: Mapped[str | None] = mapped_column(String(128))
-    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     meta: Mapped[dict] = mapped_column(default=dict, nullable=False)
 
     __table_args__ = (

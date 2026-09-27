@@ -34,6 +34,38 @@ class JSONBType(TypeDecorator):
         return dialect.type_descriptor(JSON())
 
 
+class UTCDateTime(TypeDecorator):
+    """A timestamp that is *always* timezone-aware UTC in Python.
+
+    Postgres hands back aware datetimes for ``TIMESTAMPTZ``; SQLite hands back
+    naive ones, and so do server defaults like ``CURRENT_TIMESTAMP``. Mixing the
+    two raises ``TypeError`` on subtraction, which means a naive value reaching
+    business logic turns a pacing or expiry check into a crash. Normalising in
+    the type removes the entire class of bug rather than patching call sites.
+    """
+
+    impl = DateTime
+    cache_ok = True
+
+    def __init__(self) -> None:
+        super().__init__(timezone=True)
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            # A naive value is assumed UTC: this system never works in local time.
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+
 class StrEnumType(TypeDecorator):
     """A ``StrEnum`` column that round-trips as the enum, not as ``str``.
 
@@ -136,8 +168,8 @@ class UUIDPk:
 
 class Timestamped:
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+        UTCDateTime(), server_default=func.now(), nullable=False, index=True
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+        UTCDateTime(), server_default=func.now(), onupdate=func.now(), nullable=False
     )

@@ -20,7 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, GUID, Money, StrEnumType, TelegramId, Timestamped, UUIDPk
+from app.db.base import Base, GUID, Money, StrEnumType, TelegramId, Timestamped, UTCDateTime, UUIDPk
 from app.models.enums import (
     FraudBand,
     FraudCaseStatus,
@@ -62,7 +62,7 @@ class FraudEvent(UUIDPk, Base):
     action_taken: Mapped[str | None] = mapped_column(String(64))
     amount_at_risk: Mapped[object] = mapped_column(Money, default="0", nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+        UTCDateTime(), nullable=False, index=True
     )
 
     __table_args__ = (
@@ -82,7 +82,7 @@ class FraudScore(UUIDPk, Timestamped, Base):
     band: Mapped[FraudBand] = mapped_column(StrEnumType(FraudBand, 16), nullable=False)
     signals: Mapped[dict] = mapped_column(default=dict, nullable=False)
     events_counted: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    last_event_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_event_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     __table_args__ = (
         UniqueConstraint("subject_type", "subject_id", name="uq_fraud_scores_subject"),
@@ -109,7 +109,7 @@ class FraudCase(UUIDPk, Timestamped, Base):
     assigned_staff_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID, ForeignKey("staff_users.id", ondelete="SET NULL")
     )
-    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolved_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     resolution: Mapped[str | None] = mapped_column(String(500))
 
 
@@ -134,7 +134,7 @@ class ModerationReview(UUIDPk, Timestamped, Base):
     checklist: Mapped[dict] = mapped_column(default=dict, nullable=False)
     reason: Mapped[str | None] = mapped_column(String(500))
     notes: Mapped[str | None] = mapped_column(Text)
-    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    decided_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     escalated_to_staff_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID, ForeignKey("staff_users.id", ondelete="SET NULL")
     )
@@ -165,7 +165,7 @@ class Report(UUIDPk, Timestamped, Base):
     handled_by_staff_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID, ForeignKey("staff_users.id", ondelete="SET NULL")
     )
-    handled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    handled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
 # --------------------------------------------------------------------------
@@ -200,7 +200,7 @@ class AuditLog(UUIDPk, Base):
     )
     ledger_transaction_id: Mapped[uuid.UUID | None] = mapped_column(GUID)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+        UTCDateTime(), nullable=False, index=True
     )
 
     __table_args__ = (
@@ -219,11 +219,11 @@ class EventLog(UUIDPk, Base):
     aggregate_type: Mapped[str | None] = mapped_column(String(32))
     aggregate_id: Mapped[str | None] = mapped_column(String(64), index=True)
     dispatched: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    dispatched_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_error: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+        UTCDateTime(), nullable=False, index=True
     )
 
     __table_args__ = (Index("ix_event_log_pending", "dispatched", "created_at"),)
@@ -239,9 +239,9 @@ class IdempotencyRecord(UUIDPk, Base):
     request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     status_code: Mapped[int] = mapped_column(Integer, nullable=False)
     response_body: Mapped[dict] = mapped_column(default=dict, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+        UTCDateTime(), nullable=False, index=True
     )
 
     __table_args__ = (UniqueConstraint("scope", "key", name="uq_idempotency_records_scope_key"),)
@@ -271,9 +271,9 @@ class Notification(UUIDPk, Base):
     dedupe_key: Mapped[str | None] = mapped_column(String(160))
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_error: Mapped[str | None] = mapped_column(String(500))
-    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+        UTCDateTime(), nullable=False, index=True
     )
 
     __table_args__ = (
@@ -325,8 +325,8 @@ class PricingRule(UUIDPk, Timestamped, Base):
     currency: Mapped[str | None] = mapped_column(String(3))
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     priority: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    effective_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    effective_to: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    effective_from: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    effective_to: Mapped[datetime | None] = mapped_column(UTCDateTime())
     note: Mapped[str | None] = mapped_column(String(300))
     updated_by_staff_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID, ForeignKey("staff_users.id", ondelete="SET NULL")

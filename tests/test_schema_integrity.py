@@ -163,3 +163,31 @@ def test_string_columns_all_have_a_length():
         and c.type.length is None
     ]
     assert offenders == []
+
+
+def test_every_timestamp_column_is_utc_aware():
+    """A naive datetime from the DB crashes any arithmetic against utcnow()."""
+    from sqlalchemy import DateTime
+
+    from app.db.base import UTCDateTime
+
+    offenders = [
+        f"{t.name}.{c.name}"
+        for t in Base.metadata.tables.values()
+        for c in t.columns
+        if isinstance(c.type, DateTime) and not isinstance(c.type, UTCDateTime)
+    ]
+    assert offenders == []
+
+
+def test_server_default_timestamps_read_back_aware(db, make_user):
+    """The SQLite/Postgres discrepancy that this type exists to hide."""
+    from app.db.base import utcnow
+
+    user = make_user()
+    db.commit()
+    db.expire_all()
+    reloaded = db.get(type(user), user.id)
+    assert reloaded.created_at.tzinfo is not None
+    # Must not raise: this subtraction is what broke before UTCDateTime.
+    assert (utcnow() - reloaded.created_at).total_seconds() >= 0

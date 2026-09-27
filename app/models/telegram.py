@@ -20,7 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, GUID, Money, StrEnumType, TelegramId, Timestamped, UUIDPk
+from app.db.base import Base, GUID, Money, StrEnumType, TelegramId, Timestamped, UTCDateTime, UUIDPk
 from app.models.enums import ChannelStatus, ChatType, MeasurementMode, VerificationStatus
 
 if TYPE_CHECKING:
@@ -47,17 +47,17 @@ class TelegramChat(UUIDPk, Timestamped, Base):
     invite_link: Mapped[str | None] = mapped_column(String(300))
 
     member_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    member_count_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    member_count_checked_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     bot_is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     bot_can_post: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     bot_can_delete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    bot_rights_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    bot_rights_checked_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     is_blacklisted: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False, index=True
     )
     blacklist_reason: Mapped[str | None] = mapped_column(String(500))
-    first_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    first_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     meta: Mapped[dict] = mapped_column(default=dict, nullable=False)
 
 
@@ -88,7 +88,7 @@ class PublisherChannel(UUIDPk, Timestamped, Base):
     verification_status: Mapped[VerificationStatus] = mapped_column(
         StrEnumType(VerificationStatus, 24), default=VerificationStatus.UNVERIFIED, nullable=False
     )
-    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     verification_evidence: Mapped[dict] = mapped_column(default=dict, nullable=False)
     rejection_reason: Mapped[str | None] = mapped_column(String(500))
 
@@ -116,7 +116,7 @@ class PublisherChannel(UUIDPk, Timestamped, Base):
     min_cpm_floor: Mapped[object | None] = mapped_column(Money)
 
     auto_advertising: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    last_ad_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    last_ad_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), index=True)
 
     publisher: Mapped["Publisher"] = relationship(back_populates="channels")
     chat: Mapped[TelegramChat] = relationship()
@@ -162,7 +162,7 @@ class ChannelStatDaily(UUIDPk, Base):
     ads_served: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     earnings: Mapped[object] = mapped_column(Money, default="0", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now()
+        UTCDateTime(), nullable=False, default=lambda: datetime.now()
     )
 
     __table_args__ = (

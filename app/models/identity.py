@@ -22,7 +22,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, GUID, Money, StrEnumType, TelegramId, Timestamped, UUIDPk
+from app.db.base import Base, GUID, Money, StrEnumType, TelegramId, Timestamped, UTCDateTime, UUIDPk
 from app.models.enums import Role, UserStatus
 
 if TYPE_CHECKING:
@@ -53,9 +53,9 @@ class User(UUIDPk, Timestamped, Base):
         StrEnumType(UserStatus, 16), default=UserStatus.ACTIVE, nullable=False, index=True
     )
     suspension_reason: Mapped[str | None] = mapped_column(String(500))
-    suspended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    suspended_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
-    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     signup_source: Mapped[str | None] = mapped_column(String(32))
     meta: Mapped[dict] = mapped_column(default=dict, nullable=False)
 
@@ -188,8 +188,8 @@ class StaffUser(UUIDPk, Timestamped, Base):
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     failed_logins: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    locked_until: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     last_login_ip: Mapped[str | None] = mapped_column(String(64))
 
     __table_args__ = (UniqueConstraint("email", name="uq_staff_users_email"),)

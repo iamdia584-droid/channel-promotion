@@ -27,7 +27,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, GUID, Money, StrEnumType, Timestamped, UUIDPk
+from app.db.base import Base, GUID, Money, StrEnumType, Timestamped, UTCDateTime, UUIDPk
 from app.models.enums import (
     AccountKind,
     AccountOwnerType,
@@ -121,7 +121,7 @@ class LedgerTransaction(UUIDPk, Base):
     actor_type: Mapped[str | None] = mapped_column(String(24))
     actor_id: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+        UTCDateTime(), nullable=False, index=True
     )
 
     entries: Mapped[list["LedgerEntry"]] = relationship(
@@ -151,7 +151,7 @@ class LedgerEntry(UUIDPk, Base):
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     balance_after: Mapped[object] = mapped_column(Money, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+        UTCDateTime(), nullable=False, index=True
     )
     meta: Mapped[dict] = mapped_column(default=dict, nullable=False)
 
@@ -236,7 +236,7 @@ class WalletTransaction(UUIDPk, Base):
     description: Mapped[str | None] = mapped_column(String(300))
     campaign_id: Mapped[uuid.UUID | None] = mapped_column(GUID)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+        UTCDateTime(), nullable=False, index=True
     )
     meta: Mapped[dict] = mapped_column(default=dict, nullable=False)
 
@@ -271,14 +271,14 @@ class PublisherEarning(UUIDPk, Base):
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
 
     confirm_after: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+        UTCDateTime(), nullable=False, index=True
     )
-    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    reversed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    confirmed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    reversed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     reversal_reason: Mapped[str | None] = mapped_column(String(300))
     fraud_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+        UTCDateTime(), nullable=False, index=True
     )
 
     __table_args__ = (
@@ -323,7 +323,7 @@ class Deposit(UUIDPk, Timestamped, Base):
     ledger_transaction_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID, ForeignKey("ledger_transactions.id", ondelete="RESTRICT")
     )
-    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    confirmed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     failure_reason: Mapped[str | None] = mapped_column(String(300))
     fraud_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_by_staff_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -362,7 +362,7 @@ class PayoutMethodRecord(UUIDPk, Timestamped, Base):
     branch: Mapped[str | None] = mapped_column(String(120))
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     __table_args__ = (
         UniqueConstraint(
@@ -401,7 +401,7 @@ class Withdrawal(UUIDPk, Timestamped, Base):
         GUID, ForeignKey("ledger_transactions.id", ondelete="RESTRICT")
     )
 
-    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    processed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     processed_by_staff_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID, ForeignKey("staff_users.id", ondelete="SET NULL")
     )
@@ -444,7 +444,7 @@ class Refund(UUIDPk, Timestamped, Base):
     ledger_transaction_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID, ForeignKey("ledger_transactions.id", ondelete="RESTRICT")
     )
-    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    decided_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     decided_by_staff_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID, ForeignKey("staff_users.id", ondelete="SET NULL")
     )
@@ -477,4 +477,4 @@ class DailyFinancialSnapshot(UUIDPk, Base):
     clicks: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     active_campaigns: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     active_channels: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
