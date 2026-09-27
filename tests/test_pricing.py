@@ -137,6 +137,7 @@ def test_quote_breakdown_is_persistable_and_explains_itself(db, make_campaign, m
     assert "quality" in data["multipliers"]
     assert data["advertiser_cpm"] == "60.000000"
     import json
+
     json.dumps(data)  # must be JSON-serialisable for the JSONB column
 
 

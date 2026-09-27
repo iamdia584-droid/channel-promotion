@@ -81,15 +81,27 @@ class TelegramGateway(Protocol):
     def get_chat_member(self, chat: int | str, user_id: int) -> MemberInfo: ...
     def get_me_id(self) -> int: ...
     def send_text(
-        self, chat_id: int, text: str, *, buttons: list[dict] | None = None,
+        self,
+        chat_id: int,
+        text: str,
+        *,
+        buttons: list[dict] | None = None,
         disable_preview: bool = False,
     ) -> SentMessage: ...
     def send_photo(
-        self, chat_id: int, photo: str, *, caption: str | None = None,
+        self,
+        chat_id: int,
+        photo: str,
+        *,
+        caption: str | None = None,
         buttons: list[dict] | None = None,
     ) -> SentMessage: ...
     def send_video(
-        self, chat_id: int, video: str, *, caption: str | None = None,
+        self,
+        chat_id: int,
+        video: str,
+        *,
+        caption: str | None = None,
         buttons: list[dict] | None = None,
     ) -> SentMessage: ...
     def delete_message(self, chat_id: int, message_id: int) -> bool: ...
@@ -187,15 +199,23 @@ class HttpTelegramGateway:
 
     def send_photo(self, chat_id: int, photo: str, *, caption=None, buttons=None) -> SentMessage:
         result = self._call(
-            "sendPhoto", chat_id=chat_id, photo=photo, caption=caption,
-            parse_mode="HTML", reply_markup=_markup(buttons),
+            "sendPhoto",
+            chat_id=chat_id,
+            photo=photo,
+            caption=caption,
+            parse_mode="HTML",
+            reply_markup=_markup(buttons),
         )
         return _sent(result)
 
     def send_video(self, chat_id: int, video: str, *, caption=None, buttons=None) -> SentMessage:
         result = self._call(
-            "sendVideo", chat_id=chat_id, video=video, caption=caption,
-            parse_mode="HTML", reply_markup=_markup(buttons),
+            "sendVideo",
+            chat_id=chat_id,
+            video=video,
+            caption=caption,
+            parse_mode="HTML",
+            reply_markup=_markup(buttons),
         )
         return _sent(result)
 
@@ -249,15 +269,24 @@ class FakeTelegramGateway:
         return self.bot_id
 
     def register_chat(
-        self, chat_id: int, *, title="Fake Channel", username="fakechan",
-        chat_type="channel", members=10_000, bot_admin=True, owner_id: int | None = None,
+        self,
+        chat_id: int,
+        *,
+        title="Fake Channel",
+        username="fakechan",
+        chat_type="channel",
+        members=10_000,
+        bot_admin=True,
+        owner_id: int | None = None,
     ) -> ChatInfo:
         info = ChatInfo(chat_id, chat_type, title, username)
         self.chats[chat_id] = info
         self.member_counts[chat_id] = members
         self.members[(chat_id, self.bot_id)] = MemberInfo(
             "administrator" if bot_admin else "member",
-            can_post_messages=bot_admin, can_delete_messages=bot_admin, is_bot=True,
+            can_post_messages=bot_admin,
+            can_delete_messages=bot_admin,
+            is_bot=True,
             user_id=self.bot_id,
         )
         if owner_id is not None:
@@ -290,7 +319,8 @@ class FakeTelegramGateway:
         info = self.chats.get(chat_id)
         username = info.username if info else None
         return SentMessage(
-            self._next_message_id, chat_id,
+            self._next_message_id,
+            chat_id,
             f"https://t.me/{username}/{self._next_message_id}" if username else None,
         )
 

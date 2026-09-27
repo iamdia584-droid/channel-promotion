@@ -25,7 +25,7 @@ from app.services.wallet import WalletService
 
 def _draft(**kw) -> CampaignDraft:
     now = utcnow()
-    defaults = dict(
+    defaults: dict = dict(  # noqa: C408 - kwargs style keeps the call readable
         name="Exam Preparation 2026",
         campaign_type=CampaignType.TEXT,
         total_budget=Decimal("10000"),
@@ -113,7 +113,7 @@ def test_past_schedule_is_refused(db, make_advertiser):
         "data:text/html,<script>alert(1)</script>",
         "ftp://example.com/file",
         "//example.com",
-        "https://example.com/a b",          # whitespace smuggling
+        "https://example.com/a b",  # whitespace smuggling
         "https://example.com/\nhttps://evil.com",
     ],
 )
@@ -123,19 +123,16 @@ def test_dangerous_destination_urls_are_refused(db, make_advertiser, url):
         CampaignService(db).create(make_advertiser(), _draft(destination_url=url))
 
 
-@pytest.mark.parametrize("url", ["https://example.com/x", "http://example.com",
-                                 "https://t.me/mychannel"])
+@pytest.mark.parametrize(
+    "url", ["https://example.com/x", "http://example.com", "https://t.me/mychannel"]
+)
 def test_safe_destination_urls_are_accepted(db, make_advertiser, url):
-    assert CampaignService(db).create(
-        make_advertiser(), _draft(destination_url=url)
-    ) is not None
+    assert CampaignService(db).create(make_advertiser(), _draft(destination_url=url)) is not None
 
 
 def test_image_campaign_requires_media(db, make_advertiser):
     with pytest.raises(ValidationFailed, match="image ad needs media"):
-        CampaignService(db).create(
-            make_advertiser(), _draft(campaign_type=CampaignType.IMAGE)
-        )
+        CampaignService(db).create(make_advertiser(), _draft(campaign_type=CampaignType.IMAGE))
 
 
 def test_button_campaign_requires_a_destination(db, make_advertiser):
@@ -219,8 +216,7 @@ def test_cannot_submit_twice(db, make_advertiser, funded):
 # --------------------------------------------------------------------------
 
 
-def test_approval_reserves_budget_and_starts_delivery(db, make_advertiser, funded,
-                                                      make_staff):
+def test_approval_reserves_budget_and_starts_delivery(db, make_advertiser, funded, make_staff):
     advertiser = funded(make_advertiser(), "20000")
     service = CampaignService(db)
     campaign = service.submit(service.create(advertiser, _draft()))
@@ -246,9 +242,7 @@ def test_approval_closes_the_review_and_notifies(db, make_advertiser, funded, ma
     assert review.decision is ReviewDecision.APPROVED
     assert review.staff_id == staff.id
     assert all(review.checklist.values())
-    notes = db.query(Notification).filter(
-        Notification.template == "campaign_approved"
-    ).all()
+    notes = db.query(Notification).filter(Notification.template == "campaign_approved").all()
     assert len(notes) == 1
     assert "approved" in notes[0].rendered_text
 
@@ -279,9 +273,7 @@ def test_rejection_requires_a_reason_and_notifies(db, make_advertiser, funded, m
     assert campaign.ads[0].rejection_reason == "landing page is a scam"
     wallet = WalletService(db).for_advertiser(advertiser.id)
     assert q(wallet.reserved_balance) == Decimal("0.000000")  # nothing was reserved
-    note = db.query(Notification).filter(
-        Notification.template == "campaign_rejected"
-    ).one()
+    note = db.query(Notification).filter(Notification.template == "campaign_rejected").one()
     assert "scam" in note.rendered_text
 
 
@@ -365,8 +357,7 @@ def test_admin_suspension_stops_the_ads_too(db, make_advertiser, funded, make_st
     assert campaign.ads[0].status is AdStatus.SUSPENDED
 
 
-def test_expired_campaigns_are_completed_and_notified(db, make_advertiser, funded,
-                                                      make_staff):
+def test_expired_campaigns_are_completed_and_notified(db, make_advertiser, funded, make_staff):
     advertiser = funded(make_advertiser(), "20000")
     service = CampaignService(db)
     campaign = service.approve(
@@ -378,9 +369,7 @@ def test_expired_campaigns_are_completed_and_notified(db, make_advertiser, funde
 
     assert service.complete_expired() == 1
     assert campaign.status is CampaignStatus.COMPLETED
-    assert db.query(Notification).filter(
-        Notification.template == "campaign_completed"
-    ).count() == 1
+    assert db.query(Notification).filter(Notification.template == "campaign_completed").count() == 1
 
 
 # --------------------------------------------------------------------------
@@ -403,7 +392,7 @@ def test_preview_labels_impressions_as_an_estimate(db, make_advertiser):
     """Spec §3 step 7 and §37: the preview must not promise impressions."""
     campaign = CampaignService(db).create(make_advertiser(), _draft())
     preview = CampaignService(db).preview(campaign)
-    assert preview["estimated_impressions"] == 200_000   # ৳10,000 at ৳50 CPM
+    assert preview["estimated_impressions"] == 200_000  # ৳10,000 at ৳50 CPM
     assert preview["estimate_is_not_a_guarantee"] is True
     assert preview["duration_days"] == 7
 
@@ -419,8 +408,11 @@ def test_stats_report_ctr_and_effective_cpm(db, sent_delivery):
     )
     impressions = ImpressionService(db)
     impressions.record(
-        delivery, kind=ImpressionKind.MEASURED, source=ImpressionSource.TRACKING_LINK,
-        dedupe_key="s1", quantity=10_000,
+        delivery,
+        kind=ImpressionKind.MEASURED,
+        source=ImpressionSource.TRACKING_LINK,
+        dedupe_key="s1",
+        quantity=10_000,
     )
     impressions.record_click(delivery, dedupe_key="c1")
     SettlementService(db).settle_delivery(delivery)
@@ -434,14 +426,13 @@ def test_stats_report_ctr_and_effective_cpm(db, sent_delivery):
     assert stats["channels_reached"] == 1
 
 
-def test_low_balance_warning_flags_nearly_spent_campaigns(db, make_advertiser, funded,
-                                                          make_staff):
+def test_low_balance_warning_flags_nearly_spent_campaigns(db, make_advertiser, funded, make_staff):
     advertiser = funded(make_advertiser(), "20000")
     service = CampaignService(db)
     campaign = service.approve(
         service.submit(service.create(advertiser, _draft())), Actor.staff(make_staff())
     )
     assert service.low_balance_warnings() == []
-    campaign.spent_amount = q("9500")   # 95% spent
+    campaign.spent_amount = q("9500")  # 95% spent
     db.flush()
     assert campaign in service.low_balance_warnings()

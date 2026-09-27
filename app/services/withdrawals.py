@@ -44,7 +44,6 @@ from app.services.ledger import LedgerService, credit, debit
 from app.services.settings_service import SettingsService
 from app.services.wallet import WalletService
 
-
 # --------------------------------------------------------------------------
 # Destination protection
 # --------------------------------------------------------------------------
@@ -70,7 +69,7 @@ def encrypt_destination(value: str) -> str:
     while len(stream) < len(raw):
         stream += hmac.new(key, nonce + counter.to_bytes(4, "big"), hashlib.sha256).digest()
         counter += 1
-    cipher = bytes(a ^ b for a, b in zip(raw, stream[: len(raw)]))
+    cipher = bytes(a ^ b for a, b in zip(raw, stream[: len(raw)], strict=True))
     tag = hmac.new(key, nonce + cipher, hashlib.sha256).digest()[:16]
     return base64.urlsafe_b64encode(nonce + tag + cipher).decode()
 
@@ -87,7 +86,7 @@ def decrypt_destination(blob: str) -> str:
     while len(stream) < len(cipher):
         stream += hmac.new(key, nonce + counter.to_bytes(4, "big"), hashlib.sha256).digest()
         counter += 1
-    return bytes(a ^ b for a, b in zip(cipher, stream[: len(cipher)])).decode()
+    return bytes(a ^ b for a, b in zip(cipher, stream[: len(cipher)], strict=True)).decode()
 
 
 def mask_destination(value: str) -> str:
@@ -98,9 +97,7 @@ def mask_destination(value: str) -> str:
     keep_front = 2 if len(cleaned) > 8 else 0
     keep_back = 3
     return (
-        cleaned[:keep_front]
-        + "*" * (len(cleaned) - keep_front - keep_back)
-        + cleaned[-keep_back:]
+        cleaned[:keep_front] + "*" * (len(cleaned) - keep_front - keep_back) + cleaned[-keep_back:]
     )
 
 
@@ -157,7 +154,8 @@ class WithdrawalService:
             )
         ).one_or_none()
         record = existing or PayoutMethodRecord(
-            publisher_id=publisher_id, method=method,
+            publisher_id=publisher_id,
+            method=method,
             destination_fingerprint=fingerprint,
         )
         record.destination_masked = mask_destination(destination)
@@ -207,16 +205,19 @@ class WithdrawalService:
                     PayoutMethodRecord.publisher_id == publisher_id,
                     PayoutMethodRecord.is_active.is_(True),
                 )
-                .order_by(PayoutMethodRecord.is_default.desc(),
-                          PayoutMethodRecord.created_at.desc())
+                .order_by(
+                    PayoutMethodRecord.is_default.desc(), PayoutMethodRecord.created_at.desc()
+                )
             ).all()
         )
 
     def reveal_destination(self, record: PayoutMethodRecord, actor: Actor) -> str:
         """Decrypt for an operator about to pay out. Always audited."""
         self.audit.log(
-            actor, "payout_method.revealed",
-            target_type="payout_method", target_id=record.id,
+            actor,
+            "payout_method.revealed",
+            target_type="payout_method",
+            target_id=record.id,
             reason="operator viewed the full payout destination",
         )
         return decrypt_destination(record.destination_encrypted)
@@ -229,9 +230,7 @@ class WithdrawalService:
         percent = self.settings.decimal("withdrawal_fee_percent")
         fee = q(flat + amount * percent)
         if fee >= amount:
-            raise ValidationFailed(
-                f"the withdrawal fee ({fee}) would consume the whole amount"
-            )
+            raise ValidationFailed(f"the withdrawal fee ({fee}) would consume the whole amount")
         return FeeBreakdown(amount, fee, q(amount - fee))
 
     # -- request -----------------------------------------------------------
@@ -285,8 +284,7 @@ class WithdrawalService:
         wallet = self.wallets.locked(self.wallets.for_publisher(publisher_id).id)
         if q(wallet.confirmed_balance) < amount:
             raise InsufficientFunds(
-                "not enough confirmed balance; pending earnings are not yet "
-                "withdrawable",
+                "not enough confirmed balance; pending earnings are not yet withdrawable",
                 confirmed=str(q(wallet.confirmed_balance)),
                 requested=str(amount),
                 pending=str(q(wallet.pending_balance)),
@@ -321,8 +319,11 @@ class WithdrawalService:
             legs=[
                 debit(AccountKind.PUBLISHER_CONFIRMED, breakdown.amount, publisher_id),
                 credit(AccountKind.PAYOUT_CLEARING, breakdown.net),
-                *([credit(AccountKind.PLATFORM_FEES, breakdown.fee)]
-                  if breakdown.fee > ZERO else []),
+                *(
+                    [credit(AccountKind.PLATFORM_FEES, breakdown.fee)]
+                    if breakdown.fee > ZERO
+                    else []
+                ),
             ],
             idempotency_key=f"withdrawal-request:{withdrawal.id}",
             description=f"Withdrawal requested via {method.method.value}",
@@ -340,12 +341,16 @@ class WithdrawalService:
         FraudService(self.session).score_withdrawal(withdrawal)
 
         self.audit.financial(
-            actor or Actor.system("publisher-request"), "withdrawal.requested",
-            target_type="withdrawal", target_id=withdrawal.id,
+            actor or Actor.system("publisher-request"),
+            "withdrawal.requested",
+            target_type="withdrawal",
+            target_id=withdrawal.id,
             ledger_transaction_id=result.id,
             new_value={
-                "amount": str(breakdown.amount), "fee": str(breakdown.fee),
-                "net": str(breakdown.net), "method": method.method.value,
+                "amount": str(breakdown.amount),
+                "fee": str(breakdown.fee),
+                "net": str(breakdown.net),
+                "method": method.method.value,
                 "fraud_score": withdrawal.fraud_score,
             },
         )
@@ -366,8 +371,11 @@ class WithdrawalService:
         withdrawal.processed_by_staff_id = _staff_id(actor)
         self.session.flush()
         self.audit.log(
-            actor, "withdrawal.processing", target_type="withdrawal",
-            target_id=withdrawal.id, old_value={"status": str(old)},
+            actor,
+            "withdrawal.processing",
+            target_type="withdrawal",
+            target_id=withdrawal.id,
+            old_value={"status": str(old)},
             new_value={"status": str(withdrawal.status)},
         )
         return withdrawal
@@ -413,11 +421,17 @@ class WithdrawalService:
         self.session.flush()
 
         self.audit.financial(
-            actor, "withdrawal.paid", target_type="withdrawal", target_id=withdrawal.id,
+            actor,
+            "withdrawal.paid",
+            target_type="withdrawal",
+            target_id=withdrawal.id,
             ledger_transaction_id=result.id,
             old_value={"status": str(old)},
-            new_value={"status": "paid", "net": str(withdrawal.net_amount),
-                       "reference": withdrawal.provider_reference},
+            new_value={
+                "status": "paid",
+                "net": str(withdrawal.net_amount),
+                "reference": withdrawal.provider_reference,
+            },
         )
         return withdrawal
 
@@ -430,8 +444,7 @@ class WithdrawalService:
 
         legs = [
             debit(AccountKind.PAYOUT_CLEARING, withdrawal.net_amount),
-            credit(AccountKind.PUBLISHER_CONFIRMED, withdrawal.amount,
-                   withdrawal.publisher_id),
+            credit(AccountKind.PUBLISHER_CONFIRMED, withdrawal.amount, withdrawal.publisher_id),
         ]
         if q(withdrawal.fee) > ZERO:
             # Unwind the fee too: we never collected on a payout we did not make.
@@ -461,19 +474,21 @@ class WithdrawalService:
         self.session.flush()
 
         self.audit.financial(
-            actor, "withdrawal.rejected", target_type="withdrawal",
-            target_id=withdrawal.id, ledger_transaction_id=result.id,
+            actor,
+            "withdrawal.rejected",
+            target_type="withdrawal",
+            target_id=withdrawal.id,
+            ledger_transaction_id=result.id,
             old_value={"status": str(old)},
-            new_value={"status": "rejected"}, reason=reason,
+            new_value={"status": "rejected"},
+            reason=reason,
         )
         return withdrawal
 
     def cancel(self, withdrawal: Withdrawal, actor: Actor) -> Withdrawal:
         """Publisher-initiated cancellation, allowed only while still pending."""
         if withdrawal.status is not WithdrawalStatus.PENDING:
-            raise Conflict(
-                f"a {withdrawal.status.value} withdrawal can no longer be cancelled"
-            )
+            raise Conflict(f"a {withdrawal.status.value} withdrawal can no longer be cancelled")
         result = self.reject(withdrawal, actor, "cancelled by the publisher")
         result.status = WithdrawalStatus.CANCELLED
         self.session.flush()
@@ -481,9 +496,7 @@ class WithdrawalService:
 
     # -- reads -------------------------------------------------------------
 
-    def list_for_publisher(
-        self, publisher_id: uuid.UUID, limit: int = 50
-    ) -> list[Withdrawal]:
+    def list_for_publisher(self, publisher_id: uuid.UUID, limit: int = 50) -> list[Withdrawal]:
         return list(
             self.session.scalars(
                 select(Withdrawal)
@@ -498,9 +511,7 @@ class WithdrawalService:
             self.session.scalars(
                 select(Withdrawal)
                 .where(
-                    Withdrawal.status.in_(
-                        [WithdrawalStatus.PENDING, WithdrawalStatus.PROCESSING]
-                    )
+                    Withdrawal.status.in_([WithdrawalStatus.PENDING, WithdrawalStatus.PROCESSING])
                 )
                 .order_by(Withdrawal.fraud_hold.desc(), Withdrawal.created_at)
                 .limit(limit)

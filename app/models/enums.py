@@ -194,7 +194,7 @@ class EntryDirection(StrEnum):
     CREDIT = "credit"
 
     @property
-    def opposite(self) -> "EntryDirection":
+    def opposite(self) -> EntryDirection:
         return EntryDirection.CREDIT if self is EntryDirection.DEBIT else EntryDirection.DEBIT
 
 
@@ -268,13 +268,13 @@ class RefundStatus(StrEnum):
 
 
 class FraudBand(StrEnum):
-    NORMAL = "normal"        # 0-30
-    REVIEW = "review"        # 31-60
+    NORMAL = "normal"  # 0-30
+    REVIEW = "review"  # 31-60
     SUSPICIOUS = "suspicious"  # 61-80
     HIGH_RISK = "high_risk"  # 81-100
 
     @classmethod
-    def of(cls, score: int) -> "FraudBand":
+    def of(cls, score: int) -> FraudBand:
         if score <= 30:
             return cls.NORMAL
         if score <= 60:

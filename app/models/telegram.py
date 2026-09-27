@@ -10,7 +10,6 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -20,7 +19,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, GUID, Money, StrEnumType, TelegramId, Timestamped, UTCDateTime, UUIDPk
+from app.db.base import GUID, Base, Money, StrEnumType, TelegramId, Timestamped, UTCDateTime, UUIDPk
 from app.models.enums import ChannelStatus, ChatType, MeasurementMode, VerificationStatus
 
 if TYPE_CHECKING:
@@ -53,9 +52,7 @@ class TelegramChat(UUIDPk, Timestamped, Base):
     bot_can_delete: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     bot_rights_checked_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
-    is_blacklisted: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False, index=True
-    )
+    is_blacklisted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     blacklist_reason: Mapped[str | None] = mapped_column(String(500))
     first_seen_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     meta: Mapped[dict] = mapped_column(default=dict, nullable=False)
@@ -103,9 +100,7 @@ class PublisherChannel(UUIDPk, Timestamped, Base):
     total_impressions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_clicks: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_ads_served: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    quality_score: Mapped[object] = mapped_column(
-        Numeric(6, 4), default="0.5000", nullable=False
-    )
+    quality_score: Mapped[object] = mapped_column(Numeric(6, 4), default="0.5000", nullable=False)
     fraud_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
     lifetime_earned: Mapped[object] = mapped_column(Money, default="0", nullable=False)
 
@@ -118,7 +113,7 @@ class PublisherChannel(UUIDPk, Timestamped, Base):
     auto_advertising: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_ad_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), index=True)
 
-    publisher: Mapped["Publisher"] = relationship(back_populates="channels")
+    publisher: Mapped[Publisher] = relationship(back_populates="channels")
     chat: Mapped[TelegramChat] = relationship()
 
     __table_args__ = (
@@ -184,5 +179,7 @@ class ChannelVerificationAttempt(UUIDPk, Timestamped, Base):
     )
     submitted_identifier: Mapped[str] = mapped_column(String(300), nullable=False)
     telegram_chat_id: Mapped[int | None] = mapped_column(TelegramId)
-    result: Mapped[VerificationStatus] = mapped_column(StrEnumType(VerificationStatus, 24), nullable=False)
+    result: Mapped[VerificationStatus] = mapped_column(
+        StrEnumType(VerificationStatus, 24), nullable=False
+    )
     evidence: Mapped[dict] = mapped_column(default=dict, nullable=False)

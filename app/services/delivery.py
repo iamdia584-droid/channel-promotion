@@ -35,7 +35,6 @@ from app.db.base import utcnow
 from app.models.campaigns import (
     Advertisement,
     Campaign,
-    CampaignDailySpend,
     CampaignPublisher,
     CampaignTarget,
 )
@@ -117,7 +116,10 @@ class DeliveryService:
 
         if not candidates:
             return PlanResult(
-                None, len(campaigns), 0, "no eligible campaign for this channel",
+                None,
+                len(campaigns),
+                0,
+                "no eligible campaign for this channel",
                 debug={"rejections": rejections},
             )
 
@@ -127,7 +129,9 @@ class DeliveryService:
 
         delivery = self._create_delivery(winner, channel, charge_cpm, at, candidates)
         return PlanResult(
-            delivery, len(campaigns), len(candidates),
+            delivery,
+            len(campaigns),
+            len(candidates),
             debug={"rejections": rejections, "eligible": len(candidates)},
         )
 
@@ -156,8 +160,9 @@ class DeliveryService:
             )
 
         # Frequency capping (spec §18): per-channel interval, daily and weekly.
-        interval = self._effective(channel, "min_ad_interval_minutes",
-                                  "default_min_ad_interval_minutes")
+        interval = self._effective(
+            channel, "min_ad_interval_minutes", "default_min_ad_interval_minutes"
+        )
         if channel.last_ad_at and interval > 0:
             next_allowed = channel.last_ad_at + timedelta(minutes=interval)
             if at < next_allowed:
@@ -198,9 +203,7 @@ class DeliveryService:
                     AdDelivery.channel_id == channel_id,
                     AdDelivery.sent_at.is_not(None),
                     AdDelivery.sent_at >= since,
-                    AdDelivery.status.not_in(
-                        [DeliveryStatus.FAILED, DeliveryStatus.CANCELLED]
-                    ),
+                    AdDelivery.status.not_in([DeliveryStatus.FAILED, DeliveryStatus.CANCELLED]),
                 )
             )
             or 0
@@ -219,9 +222,7 @@ class DeliveryService:
             ).all()
         )
 
-    def _evaluate(
-        self, campaign: Campaign, channel: PublisherChannel, at: datetime
-    ) -> Candidate:
+    def _evaluate(self, campaign: Campaign, channel: PublisherChannel, at: datetime) -> Candidate:
         ad = self._pick_creative(campaign)
         empty = Candidate(campaign, ad, None)  # type: ignore[arg-type]
         if ad is None:
@@ -288,9 +289,10 @@ class DeliveryService:
             return empty
 
         per_channel_cap = campaign.max_impressions_per_channel_per_day
-        if per_channel_cap is not None and self._campaign_impressions_today(
-            campaign.id, channel.id, at
-        ) >= per_channel_cap:
+        if (
+            per_channel_cap is not None
+            and self._campaign_impressions_today(campaign.id, channel.id, at) >= per_channel_cap
+        ):
             empty.rejected = "campaign per-channel daily impression cap reached"
             return empty
 
@@ -305,9 +307,7 @@ class DeliveryService:
         # Rotate deterministically by id so one creative does not dominate.
         return sorted(servable, key=lambda a: str(a.id))[0]
 
-    def _targeting_mismatch(
-        self, target: CampaignTarget, channel: PublisherChannel
-    ) -> str:
+    def _targeting_mismatch(self, target: CampaignTarget, channel: PublisherChannel) -> str:
         countries = [c.upper() for c in (target.countries or [])]
         if countries and (channel.country or "").upper() not in countries:
             return "country mismatch"
@@ -324,9 +324,13 @@ class DeliveryService:
 
         # The publisher's own acceptance list wins over advertiser targeting.
         accepted = channel.accepted_categories or []
-        if isinstance(accepted, list) and accepted:
-            if channel_category and channel_category not in [x.lower() for x in accepted]:
-                return "publisher does not accept this category"
+        if (
+            isinstance(accepted, list)
+            and accepted
+            and channel_category
+            and channel_category not in [x.lower() for x in accepted]
+        ):
+            return "publisher does not accept this category"
 
         members = channel.chat.member_count if channel.chat else 0
         if target.min_members is not None and members < target.min_members:
@@ -342,7 +346,7 @@ class DeliveryService:
         ):
             return "quality score below target minimum"
         audiences = [x.lower() for x in (target.audience_types or [])]
-        if audiences and (channel.audience_type or "").lower() not in audiences + ["any"]:
+        if audiences and (channel.audience_type or "").lower() not in [*audiences, "any"]:
             return "audience type mismatch"
         return ""
 
@@ -376,9 +380,7 @@ class DeliveryService:
                     Campaign.advertiser_id == campaign.advertiser_id,
                     AdDelivery.sent_at.is_not(None),
                     AdDelivery.sent_at >= since,
-                    AdDelivery.status.not_in(
-                        [DeliveryStatus.FAILED, DeliveryStatus.CANCELLED]
-                    ),
+                    AdDelivery.status.not_in([DeliveryStatus.FAILED, DeliveryStatus.CANCELLED]),
                 )
             )
             or 0
@@ -439,14 +441,7 @@ class DeliveryService:
 
         fatigue = self._fatigue(campaign.id, channel.id, at)
 
-        score = (
-            revenue
-            * relevance
-            * quality
-            * priority
-            * pacing_factor
-            * (Decimal(1) - fatigue)
-        )
+        score = revenue * relevance * quality * priority * pacing_factor * (Decimal(1) - fatigue)
         candidate.score = q(score)
         candidate.factors = {
             "effective_cpm": str(quote.effective_cpm),
@@ -600,7 +595,9 @@ class DeliveryService:
         # Reserve against the advertiser wallet AND the pacing counters, so a
         # crash before dispatch cannot let the budget be spent twice.
         self.wallets.reserve_budget(
-            campaign.advertiser_id, campaign.id, cost,
+            campaign.advertiser_id,
+            campaign.id,
+            cost,
             idempotency_key=f"delivery-reserve:{delivery.id}",
             description=f"Reserved for delivery to {channel.telegram_chat_id}",
         )
@@ -619,9 +616,7 @@ class DeliveryService:
         if delivery.status is DeliveryStatus.SENT:
             return delivery  # already posted; never post twice
         if delivery.status is not DeliveryStatus.RESERVED:
-            raise CampaignNotDeliverable(
-                f"delivery is {delivery.status.value}, expected reserved"
-            )
+            raise CampaignNotDeliverable(f"delivery is {delivery.status.value}, expected reserved")
 
         ad = self.session.get(Advertisement, delivery.advertisement_id)
         channel = self.session.get(PublisherChannel, delivery.channel_id)
@@ -634,17 +629,23 @@ class DeliveryService:
         try:
             if ad.ad_format.value == "image" and (ad.media_file_id or ad.media_url):
                 sent = self.gateway.send_photo(
-                    delivery.telegram_chat_id, ad.media_file_id or ad.media_url,
-                    caption=text, buttons=buttons,
+                    delivery.telegram_chat_id,
+                    ad.media_file_id or ad.media_url,
+                    caption=text,
+                    buttons=buttons,
                 )
             elif ad.ad_format.value == "video" and (ad.media_file_id or ad.media_url):
                 sent = self.gateway.send_video(
-                    delivery.telegram_chat_id, ad.media_file_id or ad.media_url,
-                    caption=text, buttons=buttons,
+                    delivery.telegram_chat_id,
+                    ad.media_file_id or ad.media_url,
+                    caption=text,
+                    buttons=buttons,
                 )
             else:
                 sent = self.gateway.send_text(
-                    delivery.telegram_chat_id, text, buttons=buttons,
+                    delivery.telegram_chat_id,
+                    text,
+                    buttons=buttons,
                     disable_preview=ad.disable_preview,
                 )
         except TelegramError as exc:
@@ -663,8 +664,10 @@ class DeliveryService:
         channel.total_ads_served += 1
         self.session.flush()
         log.info(
-            "ad_delivered", delivery_id=str(delivery.id),
-            chat_id=delivery.telegram_chat_id, message_id=sent.telegram_message_id,
+            "ad_delivered",
+            delivery_id=str(delivery.id),
+            chat_id=delivery.telegram_chat_id,
+            message_id=sent.telegram_message_id,
         )
         return delivery
 
@@ -676,7 +679,9 @@ class DeliveryService:
         amount = q(delivery.reserved_amount)
         if campaign is not None and amount > ZERO:
             self.wallets.release_budget(
-                campaign.advertiser_id, campaign.id, amount,
+                campaign.advertiser_id,
+                campaign.id,
+                amount,
                 idempotency_key=f"delivery-release:{delivery.id}",
                 description="Released after failed delivery",
             )
@@ -741,9 +746,7 @@ class DeliveryService:
         ).all()
         removed = 0
         for delivery in rows:
-            if self.gateway.delete_message(
-                delivery.telegram_chat_id, delivery.telegram_message_id
-            ):
+            if self.gateway.delete_message(delivery.telegram_chat_id, delivery.telegram_message_id):
                 removed += 1
             delivery.removed_at = utcnow()
         self.session.flush()

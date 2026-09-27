@@ -173,9 +173,7 @@ class PricingService:
         max_cpm = self.settings.money("max_cpm")
         notes: list[str] = []
         if bid < min_cpm:
-            raise ValidationFailed(
-                f"bid {bid} is below the configured minimum CPM {min_cpm}"
-            )
+            raise ValidationFailed(f"bid {bid} is below the configured minimum CPM {min_cpm}")
         if bid > max_cpm:
             bid = max_cpm
             notes.append(f"bid clamped to max_cpm {max_cpm}")
@@ -187,8 +185,11 @@ class PricingService:
             ("category", PricingRuleScope.CATEGORY, channel.category),
             ("ad_format", PricingRuleScope.AD_FORMAT, _format_key(campaign.campaign_type)),
             ("channel_size", PricingRuleScope.CHANNEL_SIZE, size_band(members)),
-            ("quality_tier", PricingRuleScope.QUALITY_TIER,
-             quality_tier(D(channel.quality_score or 0))),
+            (
+                "quality_tier",
+                PricingRuleScope.QUALITY_TIER,
+                quality_tier(D(channel.quality_score or 0)),
+            ),
         ):
             mult, rule = self.multiplier(scope, value, currency, at)
             factors.append((label, mult, rule))
@@ -217,9 +218,7 @@ class PricingService:
         # The publisher's own floor is respected by refusing to serve below it,
         # which the delivery engine checks — never by silently underpaying.
         if channel.min_cpm_floor is not None and effective < q(channel.min_cpm_floor):
-            notes.append(
-                f"below channel floor {q(channel.min_cpm_floor)}; channel is ineligible"
-            )
+            notes.append(f"below channel floor {q(channel.min_cpm_floor)}; channel is ineligible")
 
         commission_rate = self._commission_rate(factors)
         _, commission_per_mille = split_commission(effective, commission_rate)
@@ -239,9 +238,7 @@ class PricingService:
             notes=tuple(notes),
         )
 
-    def _commission_rate(
-        self, factors: list[tuple[str, Decimal, PricingRule | None]]
-    ) -> Decimal:
+    def _commission_rate(self, factors: list[tuple[str, Decimal, PricingRule | None]]) -> Decimal:
         """Most specific override wins; otherwise the global rate."""
         for label in ("category", "country"):
             for name, _, rule in factors:

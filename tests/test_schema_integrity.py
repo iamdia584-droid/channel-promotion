@@ -28,8 +28,11 @@ def _strenum_annotations(cls) -> dict[str, type]:
         if not args:
             continue
         inner = args[0]  # Mapped[X] -> X
-        candidates = [a for a in ([inner] + list(typing.get_args(inner)))
-                      if isinstance(a, type) and issubclass(a, enum.StrEnum)]
+        candidates = [
+            a
+            for a in [inner, *typing.get_args(inner)]
+            if isinstance(a, type) and issubclass(a, enum.StrEnum)
+        ]
         if candidates:
             out[name] = candidates[0]
     return out
@@ -65,7 +68,9 @@ def test_enum_columns_round_trip_as_enums(db, make_advertiser):
     from app.services.ledger import LedgerService
 
     adv = make_advertiser()
-    account = LedgerService(db).get_or_create_account(AccountKind.ADVERTISER_AVAILABLE, "BDT", adv.id)
+    account = LedgerService(db).get_or_create_account(
+        AccountKind.ADVERTISER_AVAILABLE, "BDT", adv.id
+    )
     account_id = account.id
     db.commit()
     db.expire_all()  # force a real reload from the database
@@ -158,9 +163,7 @@ def test_string_columns_all_have_a_length():
         f"{t.name}.{c.name}"
         for t in Base.metadata.tables.values()
         for c in t.columns
-        if isinstance(c.type, String)
-        and type(c.type) is String
-        and c.type.length is None
+        if isinstance(c.type, String) and type(c.type) is String and c.type.length is None
     ]
     assert offenders == []
 

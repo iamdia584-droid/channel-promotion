@@ -52,13 +52,13 @@ async def start_add_channel(event, state: FSMContext) -> None:
     with bot_session() as db:
         user = resolve_user(db, event.from_user)
         if not user.is_publisher:
-            await _edit_or_send(event, texts.not_registered("a publisher"),
-                                menus.back_to("menu"))
+            await _edit_or_send(event, texts.not_registered("a publisher"), menus.back_to("menu"))
             return
         bot_username = app_settings.telegram_bot_username or "this_bot"
     await state.set_state(AddChannel.identifier)
     await _edit_or_send(
-        event, texts.channel_verification_prompt(bot_username),
+        event,
+        texts.channel_verification_prompt(bot_username),
         menus.cancel_only("role:publisher"),
     )
 
@@ -77,12 +77,10 @@ async def receive_identifier(message: Message, state: FSMContext) -> None:
             note = result.user_message()
             channel_id = str(result.channel.id) if result.channel else None
             title = (
-                result.channel.chat.title
-                if result.channel and result.channel.chat else identifier
+                result.channel.chat.title if result.channel and result.channel.chat else identifier
             )
     except AdNetError as exc:
-        await message.answer(f"❌ {exc.message}",
-                             reply_markup=menus.back_to("role:publisher"))
+        await message.answer(f"❌ {exc.message}", reply_markup=menus.back_to("role:publisher"))
         await state.clear()
         return
 
@@ -142,8 +140,9 @@ async def list_channels(callback: CallbackQuery, state: FSMContext) -> None:
     with bot_session() as db:
         user = resolve_user(db, callback.from_user)
         if not user.is_publisher:
-            await _edit_or_send(callback, texts.not_registered("a publisher"),
-                                menus.back_to("menu"))
+            await _edit_or_send(
+                callback, texts.not_registered("a publisher"), menus.back_to("menu")
+            )
             return
         channels = ChannelService(db).list_for_publisher(user.publisher.id)
         currency = user.publisher.currency
@@ -162,8 +161,11 @@ async def list_channels(callback: CallbackQuery, state: FSMContext) -> None:
                 )
                 rows.append([(f"{title[:28]} ({c.status.value})", f"channel:view:{c.id}")])
             text = "\n".join(lines)
-    keyboard = menus._kb(rows + [[("⬅️ Back", "role:publisher")]]) if rows \
+    keyboard = (
+        menus._kb([*rows, [("⬅️ Back", "role:publisher")]])
+        if rows
         else menus.back_to("role:publisher")
+    )
     await _edit_or_send(callback, text, keyboard)
 
 
@@ -196,9 +198,7 @@ async def view_channel(callback: CallbackQuery, state: FSMContext) -> None:
             "<i>Payment is based on measured ad reach, not member count.</i>"
         )
         auto_on = channel.auto_advertising
-    await callback.message.edit_text(
-        text, reply_markup=menus.channel_actions(channel_id, auto_on)
-    )
+    await callback.message.edit_text(text, reply_markup=menus.channel_actions(channel_id, auto_on))
     await callback.answer()
 
 
@@ -254,8 +254,7 @@ async def earnings(event, state: FSMContext) -> None:
     with bot_session() as db:
         user = resolve_user(db, event.from_user)
         if not user.is_publisher or not user.publisher:
-            await _edit_or_send(event, texts.not_registered("a publisher"),
-                                menus.back_to("menu"))
+            await _edit_or_send(event, texts.not_registered("a publisher"), menus.back_to("menu"))
             return
         summary = EarningsService(db).summary(user.publisher.id)
         overview = AnalyticsService(db).publisher_overview(user.publisher.id)
@@ -288,8 +287,7 @@ async def start_withdraw(event, state: FSMContext) -> None:
     with bot_session() as db:
         user = resolve_user(db, event.from_user)
         if not user.is_publisher or not user.publisher:
-            await _edit_or_send(event, texts.not_registered("a publisher"),
-                                menus.back_to("menu"))
+            await _edit_or_send(event, texts.not_registered("a publisher"), menus.back_to("menu"))
             return
         summary = EarningsService(db).summary(user.publisher.id)
         currency = user.publisher.currency
@@ -333,8 +331,7 @@ async def withdraw_amount(message: Message, state: FSMContext) -> None:
         currency = user.publisher.currency
         if amount > summary["confirmed"]:
             await message.answer(
-                f"You can withdraw up to {fmt(summary['confirmed'], currency)} "
-                "right now."
+                f"You can withdraw up to {fmt(summary['confirmed'], currency)} right now."
             )
             return
         try:
@@ -343,8 +340,9 @@ async def withdraw_amount(message: Message, state: FSMContext) -> None:
             await message.answer(f"❌ {exc.message}")
             return
         methods = service.list_payout_methods(user.publisher.id)
-        saved = [(f"{m.method.value} · {m.destination_masked}", f"withdraw:use:{m.id}")
-                 for m in methods]
+        saved = [
+            (f"{m.method.value} · {m.destination_masked}", f"withdraw:use:{m.id}") for m in methods
+        ]
 
     await state.update_data(amount=str(amount))
     text = (
@@ -367,9 +365,7 @@ async def withdraw_amount(message: Message, state: FSMContext) -> None:
 @router.callback_query(F.data == "withdraw:new")
 async def withdraw_new_method(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(Withdraw.method)
-    await callback.message.edit_text(
-        "Choose a payout method:", reply_markup=menus.payout_methods()
-    )
+    await callback.message.edit_text("Choose a payout method:", reply_markup=menus.payout_methods())
     await callback.answer()
 
 
@@ -384,8 +380,7 @@ async def withdraw_pick_method(callback: CallbackQuery, state: FSMContext) -> No
         else "Send your account number."
     )
     await callback.message.edit_text(
-        f"<b>{method}</b>\n\n{hint}\n\n"
-        "<i>Stored encrypted and shown only in masked form.</i>",
+        f"<b>{method}</b>\n\n{hint}\n\n<i>Stored encrypted and shown only in masked form.</i>",
         reply_markup=menus.cancel_only("role:publisher"),
     )
     await callback.answer()
@@ -403,7 +398,9 @@ async def withdraw_destination(message: Message, state: FSMContext) -> None:
                 user.publisher.id, PayoutMethod(data["method"]), destination
             )
             withdrawal = service.request(
-                user.publisher.id, Decimal(data["amount"]), record.id,
+                user.publisher.id,
+                Decimal(data["amount"]),
+                record.id,
                 actor=Actor.user(user),
             )
             text = _withdrawal_receipt(withdrawal)
@@ -420,15 +417,16 @@ async def withdraw_use_saved(callback: CallbackQuery, state: FSMContext) -> None
     data = await state.get_data()
     amount = data.get("amount")
     if not amount:
-        await callback.answer("That session expired. Start again with /withdraw.",
-                              show_alert=True)
+        await callback.answer("That session expired. Start again with /withdraw.", show_alert=True)
         await state.clear()
         return
     try:
         with bot_session() as db:
             user = resolve_user(db, callback.from_user)
             withdrawal = WithdrawalService(db).request(
-                user.publisher.id, Decimal(amount), uuid.UUID(method_id),
+                user.publisher.id,
+                Decimal(amount),
+                uuid.UUID(method_id),
                 actor=Actor.user(user),
             )
             text = _withdrawal_receipt(withdrawal)

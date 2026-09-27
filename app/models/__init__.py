@@ -45,11 +45,11 @@ from app.models.telegram import (
 )
 
 __all__ = [
-    "Base",
     "AdDelivery",
     "Advertisement",
     "Advertiser",
     "AuditLog",
+    "Base",
     "Campaign",
     "CampaignDailySpend",
     "CampaignPublisher",

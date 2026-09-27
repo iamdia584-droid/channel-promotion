@@ -92,6 +92,4 @@ COMMANDS = [
 async def set_commands() -> None:
     from aiogram.types import BotCommand
 
-    await get_bot().set_my_commands(
-        [BotCommand(command=c, description=d) for c, d in COMMANDS]
-    )
+    await get_bot().set_my_commands([BotCommand(command=c, description=d) for c, d in COMMANDS])

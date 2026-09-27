@@ -63,9 +63,7 @@ def _impressions(db, delivery, n, prefix="s", rows=None):
 
 def test_spec_section_11_end_to_end(db, sent_delivery):
     """50,000 impressions at ৳100 CPM, 20% commission → ৳4,000 / ৳1,000."""
-    SettingsService(db).set(
-        "hour_weights", "[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]"
-    )
+    SettingsService(db).set("hour_weights", "[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]")
     delivery, campaign, channel, advertiser = sent_delivery(
         bid_cpm="100", avg_views=100_000, budget="400000", commission="0.20"
     )
@@ -90,9 +88,7 @@ def test_settlement_keeps_the_ledger_balanced(db, sent_delivery):
 
 
 def test_publisher_earnings_and_platform_revenue_match_advertiser_spend(db, sent_delivery):
-    SettingsService(db).set(
-        "hour_weights", "[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]"
-    )
+    SettingsService(db).set("hour_weights", "[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]")
     delivery, campaign, channel, advertiser = sent_delivery(
         bid_cpm="123.456789", avg_views=40_000, budget="400000", commission="0.3333"
     )
@@ -153,9 +149,7 @@ def test_impressions_arriving_mid_window_settle_in_a_second_batch(db, sent_deliv
     While the measurement window is open the reservation is deliberately kept, so
     impressions that arrive after an early settlement are still payable.
     """
-    SettingsService(db).set(
-        "hour_weights", "[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]"
-    )
+    SettingsService(db).set("hour_weights", "[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]")
     delivery, campaign, channel, advertiser = sent_delivery(
         avg_views=50_000, bid_cpm="100", budget="400000"
     )
@@ -164,7 +158,7 @@ def test_impressions_arriving_mid_window_settle_in_a_second_batch(db, sent_deliv
 
     first = service.settle_delivery(delivery)
     assert first.impressions == 1_000
-    assert delivery.status is DeliveryStatus.MEASURING   # window still open
+    assert delivery.status is DeliveryStatus.MEASURING  # window still open
     assert q(delivery.reserved_amount) > q(delivery.settled_amount)
 
     _impressions(db, delivery, 500, prefix="b")
@@ -176,9 +170,7 @@ def test_impressions_arriving_mid_window_settle_in_a_second_batch(db, sent_deliv
 
 
 def test_reservation_is_released_once_the_window_closes(db, sent_delivery):
-    SettingsService(db).set(
-        "hour_weights", "[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]"
-    )
+    SettingsService(db).set("hour_weights", "[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]")
     delivery, campaign, channel, advertiser = sent_delivery(
         avg_views=50_000, bid_cpm="100", budget="400000"
     )
@@ -194,9 +186,7 @@ def test_reservation_is_released_once_the_window_closes(db, sent_delivery):
     assert delivery.status is DeliveryStatus.SETTLED
     wallet = WalletService(db).for_advertiser(advertiser.id)
     assert q(wallet.reserved_balance) == Decimal("0.000000")
-    assert all(
-        v == 0 for v in WalletService(db).verify_against_ledger(wallet).values()
-    )
+    assert all(v == 0 for v in WalletService(db).verify_against_ledger(wallet).values())
 
 
 # --------------------------------------------------------------------------
@@ -239,9 +229,7 @@ def test_unused_reservation_is_returned_to_the_advertiser(db, sent_delivery):
     wallet = WalletService(db).for_advertiser(advertiser.id)
     assert q(wallet.reserved_balance) == Decimal("0.000000")
     assert q(wallet.spent_total) == result.gross
-    assert all(
-        v == 0 for v in WalletService(db).verify_against_ledger(wallet).values()
-    )
+    assert all(v == 0 for v in WalletService(db).verify_against_ledger(wallet).values())
 
 
 def test_settlement_never_exceeds_the_reservation(db, sent_delivery):
@@ -272,7 +260,7 @@ def test_settle_due_only_picks_closed_windows(db, sent_delivery):
     _impressions(db, delivery, 1_000)
     service = SettlementService(db)
 
-    assert service.settle_due(now=utcnow()) == []          # window still open
+    assert service.settle_due(now=utcnow()) == []  # window still open
     results = service.settle_due(now=delivery.measurement_ends_at + timedelta(minutes=1))
     assert len(results) == 1 and results[0].settled is True
 
@@ -296,7 +284,7 @@ def test_earnings_start_pending_and_are_not_withdrawable(db, sent_delivery):
     wallet = WalletService(db).for_publisher(delivery.publisher_id)
     assert q(wallet.pending_balance) == result.publisher_amount
     assert q(wallet.confirmed_balance) == Decimal("0.000000")
-    assert q(wallet.withdrawable) == Decimal("0.000000")   # cannot be withdrawn yet
+    assert q(wallet.withdrawable) == Decimal("0.000000")  # cannot be withdrawn yet
 
 
 def test_earnings_confirm_after_the_validation_window(db, sent_delivery):
@@ -315,9 +303,7 @@ def test_earnings_confirm_after_the_validation_window(db, sent_delivery):
     assert q(wallet.pending_balance) == Decimal("0.000000")
     assert q(wallet.confirmed_balance) == batch.amount
     assert q(wallet.withdrawable) == batch.amount
-    assert all(
-        v == 0 for v in WalletService(db).verify_against_ledger(wallet).values()
-    )
+    assert all(v == 0 for v in WalletService(db).verify_against_ledger(wallet).values())
 
 
 def test_confirmation_is_idempotent(db, sent_delivery):
@@ -411,6 +397,6 @@ def test_earnings_summary_reports_honest_effective_cpm(db, sent_delivery):
     summary = EarningsService(db).summary(delivery.publisher_id)
 
     assert summary["billable_impressions"] == 10_000
-    assert summary["pending"] == Decimal("800.000000")     # 10,000 × ৳80 / 1000
+    assert summary["pending"] == Decimal("800.000000")  # 10,000 × ৳80 / 1000
     assert summary["effective_cpm"] == Decimal("80.000000")
     assert summary["confirmed"] == Decimal("0.000000")

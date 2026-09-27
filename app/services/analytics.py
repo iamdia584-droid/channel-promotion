@@ -10,12 +10,13 @@ from __future__ import annotations
 import csv
 import io
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Any, Iterable
+from typing import Any
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.money import ZERO, D, pct, q
@@ -58,12 +59,12 @@ class DateRange:
     end: datetime
 
     @classmethod
-    def last_days(cls, days: int = 30) -> "DateRange":
+    def last_days(cls, days: int = 30) -> DateRange:
         end = utcnow()
         return cls(end - timedelta(days=days), end)
 
     @classmethod
-    def today(cls) -> "DateRange":
+    def today(cls) -> DateRange:
         now = utcnow()
         return cls(now.replace(hour=0, minute=0, second=0, microsecond=0), now)
 
@@ -91,29 +92,24 @@ class AnalyticsService:
 
         return {
             "campaigns_total": len(campaigns),
-            "campaigns_active": sum(
-                1 for c in campaigns if c.status is CampaignStatus.RUNNING
-            ),
+            "campaigns_active": sum(1 for c in campaigns if c.status is CampaignStatus.RUNNING),
             "spend": spend,
             "billable_impressions": impressions,
             "clicks": clicks,
             "ctr_percent": pct(clicks, impressions),
             "effective_cpm": q(spend * 1000 / D(impressions)) if impressions else ZERO,
             "cost_per_click": q(spend / D(clicks)) if clicks else ZERO,
-            "remaining_budget": q(
-                sum((q(c.remaining_budget) for c in campaigns), ZERO)
-            ),
+            "remaining_budget": q(sum((q(c.remaining_budget) for c in campaigns), ZERO)),
             "deliveries": _count(
-                self.session, AdDelivery.id,
+                self.session,
+                AdDelivery.id,
                 AdDelivery.campaign_id.in_(campaign_ids or [uuid.uuid4()]),
                 AdDelivery.sent_at.is_not(None),
             ),
             "window": {"start": window.start, "end": window.end},
         }
 
-    def advertiser_daily(
-        self, advertiser_id: uuid.UUID, days: int = 30
-    ) -> list[dict[str, Any]]:
+    def advertiser_daily(self, advertiser_id: uuid.UUID, days: int = 30) -> list[dict[str, Any]]:
         """Daily spend/impressions/clicks for the performance chart."""
         since = utcnow() - timedelta(days=days)
         rows = self.session.execute(
@@ -173,7 +169,8 @@ class AnalyticsService:
                     "spend": q(spend or 0),
                     "deliveries": int(deliveries or 0),
                     "effective_cpm": q(q(spend or 0) * 1000 / D(impressions))
-                    if impressions else ZERO,
+                    if impressions
+                    else ZERO,
                 }
             )
         return out
@@ -189,13 +186,15 @@ class AnalyticsService:
 
         def earnings(status: EarningStatus) -> Decimal:
             return _sum(
-                self.session, PublisherEarning.net_amount,
+                self.session,
+                PublisherEarning.net_amount,
                 PublisherEarning.publisher_id == publisher_id,
                 PublisherEarning.status == status,
             )
 
         impressions = _sum(
-            self.session, PublisherEarning.billable_impressions,
+            self.session,
+            PublisherEarning.billable_impressions,
             PublisherEarning.publisher_id == publisher_id,
         )
         impressions = int(impressions)
@@ -217,11 +216,10 @@ class AnalyticsService:
             "total_earned": total,
             "effective_cpm": q(total * 1000 / D(impressions)) if impressions else ZERO,
             "withdrawals_pending": _count(
-                self.session, Withdrawal.id,
+                self.session,
+                Withdrawal.id,
                 Withdrawal.publisher_id == publisher_id,
-                Withdrawal.status.in_(
-                    [WithdrawalStatus.PENDING, WithdrawalStatus.PROCESSING]
-                ),
+                Withdrawal.status.in_([WithdrawalStatus.PENDING, WithdrawalStatus.PROCESSING]),
             ),
         }
 
@@ -280,13 +278,15 @@ class AnalyticsService:
         today = DateRange.today()
 
         gross_spend = _sum(
-            self.session, LedgerTransaction.amount,
+            self.session,
+            LedgerTransaction.amount,
             LedgerTransaction.transaction_type == TransactionType.SETTLEMENT,
             LedgerTransaction.status == TransactionStatus.POSTED,
             LedgerTransaction.currency == currency,
         )
         publisher_revenue = _sum(
-            self.session, PublisherEarning.net_amount,
+            self.session,
+            PublisherEarning.net_amount,
             PublisherEarning.status != EarningStatus.REVERSED,
             PublisherEarning.currency == currency,
         )
@@ -306,53 +306,49 @@ class AnalyticsService:
             "publisher_revenue": publisher_revenue,
             "fraud_reversed": clawed_back,
             "advertiser_deposits": _sum(
-                self.session, Deposit.net_amount,
+                self.session,
+                Deposit.net_amount,
                 Deposit.status == DepositStatus.CONFIRMED,
                 Deposit.currency == currency,
             ),
-            "refunds": _sum(
-                self.session, Refund.approved_amount, Refund.currency == currency
-            ),
+            "refunds": _sum(self.session, Refund.approved_amount, Refund.currency == currency),
             "withdrawals_paid": _sum(
-                self.session, Withdrawal.net_amount,
+                self.session,
+                Withdrawal.net_amount,
                 Withdrawal.status == WithdrawalStatus.PAID,
                 Withdrawal.currency == currency,
             ),
             "pending_withdrawals_count": _count(
-                self.session, Withdrawal.id,
-                Withdrawal.status.in_(
-                    [WithdrawalStatus.PENDING, WithdrawalStatus.PROCESSING]
-                ),
+                self.session,
+                Withdrawal.id,
+                Withdrawal.status.in_([WithdrawalStatus.PENDING, WithdrawalStatus.PROCESSING]),
             ),
             "pending_withdrawals_amount": _sum(
-                self.session, Withdrawal.net_amount,
-                Withdrawal.status.in_(
-                    [WithdrawalStatus.PENDING, WithdrawalStatus.PROCESSING]
-                ),
+                self.session,
+                Withdrawal.net_amount,
+                Withdrawal.status.in_([WithdrawalStatus.PENDING, WithdrawalStatus.PROCESSING]),
             ),
             "active_campaigns": _count(
                 self.session, Campaign.id, Campaign.status == CampaignStatus.RUNNING
             ),
             "campaigns_awaiting_review": _count(
-                self.session, Campaign.id,
-                Campaign.status.in_(
-                    [CampaignStatus.SUBMITTED, CampaignStatus.UNDER_REVIEW]
-                ),
+                self.session,
+                Campaign.id,
+                Campaign.status.in_([CampaignStatus.SUBMITTED, CampaignStatus.UNDER_REVIEW]),
             ),
             "active_publishers": _count(
-                self.session, func.distinct(PublisherChannel.publisher_id),
-                PublisherChannel.status.in_(
-                    [ChannelStatus.ACTIVE, ChannelStatus.VERIFIED]
-                ),
+                self.session,
+                func.distinct(PublisherChannel.publisher_id),
+                PublisherChannel.status.in_([ChannelStatus.ACTIVE, ChannelStatus.VERIFIED]),
             ),
             "active_channels": _count(
-                self.session, PublisherChannel.id,
-                PublisherChannel.status.in_(
-                    [ChannelStatus.ACTIVE, ChannelStatus.VERIFIED]
-                ),
+                self.session,
+                PublisherChannel.id,
+                PublisherChannel.status.in_([ChannelStatus.ACTIVE, ChannelStatus.VERIFIED]),
             ),
             "channels_awaiting_review": _count(
-                self.session, PublisherChannel.id,
+                self.session,
+                PublisherChannel.id,
                 PublisherChannel.status == ChannelStatus.PENDING,
             ),
             "advertisers_total": _count(self.session, Advertiser.id),
@@ -363,14 +359,17 @@ class AnalyticsService:
             "total_clicks": _count(self.session, Click.id, Click.valid.is_(True)),
             "impressions_today": int(
                 _sum(
-                    self.session, Impression.quantity,
+                    self.session,
+                    Impression.quantity,
                     Impression.billable.is_(True),
                     Impression.occurred_at >= today.start,
                 )
             ),
             "clicks_today": _count(
-                self.session, Click.id,
-                Click.valid.is_(True), Click.occurred_at >= today.start,
+                self.session,
+                Click.id,
+                Click.valid.is_(True),
+                Click.occurred_at >= today.start,
             ),
             "trial_balance": ledger.trial_balance(currency),
         }
@@ -379,40 +378,38 @@ class AnalyticsService:
     # Daily financial snapshot (spec §33)
     # ------------------------------------------------------------------
 
-    def build_snapshot(self, day: date | None = None, currency: str = "BDT") -> DailyFinancialSnapshot:
+    def build_snapshot(
+        self, day: date | None = None, currency: str = "BDT"
+    ) -> DailyFinancialSnapshot:
         """Aggregate one day's finances. Idempotent: rebuilds in place."""
         day = day or (utcnow().date() - timedelta(days=1))
-        start = datetime.combine(day, datetime.min.time()).replace(
-            tzinfo=utcnow().tzinfo
-        )
+        start = datetime.combine(day, datetime.min.time()).replace(tzinfo=utcnow().tzinfo)
         end = start + timedelta(days=1)
 
         def between(column):
             return (column >= start, column < end)
 
         gross = _sum(
-            self.session, LedgerTransaction.amount,
+            self.session,
+            LedgerTransaction.amount,
             LedgerTransaction.transaction_type == TransactionType.SETTLEMENT,
             LedgerTransaction.status == TransactionStatus.POSTED,
             LedgerTransaction.currency == currency,
             *between(LedgerTransaction.created_at),
         )
         publisher_payout = _sum(
-            self.session, PublisherEarning.net_amount,
+            self.session,
+            PublisherEarning.net_amount,
             PublisherEarning.currency == currency,
             PublisherEarning.status != EarningStatus.REVERSED,
             *between(PublisherEarning.created_at),
         )
 
         row = self.session.scalars(
-            select(DailyFinancialSnapshot).where(
-                DailyFinancialSnapshot.snapshot_date == day
-            )
+            select(DailyFinancialSnapshot).where(DailyFinancialSnapshot.snapshot_date == day)
         ).one_or_none()
         if row is None:
-            row = DailyFinancialSnapshot(
-                snapshot_date=day, currency=currency, created_at=utcnow()
-            )
+            row = DailyFinancialSnapshot(snapshot_date=day, currency=currency, created_at=utcnow())
             self.session.add(row)
 
         row.gross_ad_spend = gross
@@ -421,32 +418,43 @@ class AnalyticsService:
         # derived, so the three figures always reconcile.
         row.platform_revenue = q(gross - publisher_payout)
         row.advertiser_deposits = _sum(
-            self.session, Deposit.net_amount,
-            Deposit.status == DepositStatus.CONFIRMED, Deposit.currency == currency,
+            self.session,
+            Deposit.net_amount,
+            Deposit.status == DepositStatus.CONFIRMED,
+            Deposit.currency == currency,
             *between(Deposit.confirmed_at),
         )
         row.refunds = _sum(
-            self.session, Refund.approved_amount, Refund.currency == currency,
+            self.session,
+            Refund.approved_amount,
+            Refund.currency == currency,
             *between(Refund.decided_at),
         )
         row.withdrawals_paid = _sum(
-            self.session, Withdrawal.net_amount,
-            Withdrawal.status == WithdrawalStatus.PAID, Withdrawal.currency == currency,
+            self.session,
+            Withdrawal.net_amount,
+            Withdrawal.status == WithdrawalStatus.PAID,
+            Withdrawal.currency == currency,
             *between(Withdrawal.processed_at),
         )
         row.withdrawal_fees = _sum(
-            self.session, Withdrawal.fee,
-            Withdrawal.status == WithdrawalStatus.PAID, Withdrawal.currency == currency,
+            self.session,
+            Withdrawal.fee,
+            Withdrawal.status == WithdrawalStatus.PAID,
+            Withdrawal.currency == currency,
             *between(Withdrawal.processed_at),
         )
         row.fraud_reversed = _sum(
-            self.session, PublisherEarning.net_amount,
+            self.session,
+            PublisherEarning.net_amount,
             PublisherEarning.status == EarningStatus.REVERSED,
             *between(PublisherEarning.reversed_at),
         )
         row.billable_impressions = int(
             _sum(
-                self.session, Impression.quantity, Impression.billable.is_(True),
+                self.session,
+                Impression.quantity,
+                Impression.billable.is_(True),
                 *between(Impression.occurred_at),
             )
         )
@@ -457,7 +465,8 @@ class AnalyticsService:
             self.session, Campaign.id, Campaign.status == CampaignStatus.RUNNING
         )
         row.active_channels = _count(
-            self.session, PublisherChannel.id,
+            self.session,
+            PublisherChannel.id,
             PublisherChannel.status.in_([ChannelStatus.ACTIVE, ChannelStatus.VERIFIED]),
         )
         self.session.flush()
@@ -498,9 +507,7 @@ class AnalyticsService:
                 func.date(Impression.occurred_at),
                 Campaign.name,
                 func.coalesce(func.sum(Impression.quantity), 0),
-                func.coalesce(
-                    func.sum(Impression.unit_advertiser_cost * Impression.quantity), 0
-                ),
+                func.coalesce(func.sum(Impression.unit_advertiser_cost * Impression.quantity), 0),
             )
             .join(Campaign, Campaign.id == Impression.campaign_id)
             .where(
@@ -516,7 +523,8 @@ class AnalyticsService:
             impressions = int(impressions or 0)
             spend = q(spend or 0)
             clicks = _count(
-                self.session, Click.id,
+                self.session,
+                Click.id,
                 Click.campaign_id.in_(
                     select(Campaign.id).where(
                         Campaign.advertiser_id == advertiser_id, Campaign.name == name
@@ -527,15 +535,17 @@ class AnalyticsService:
             )
             out.append(
                 {
-                    "date": str(day), "campaign": name, "spend": spend,
-                    "impressions": impressions, "clicks": clicks,
+                    "date": str(day),
+                    "campaign": name,
+                    "spend": spend,
+                    "impressions": impressions,
+                    "clicks": clicks,
                     "ctr_percent": pct(clicks, impressions),
                     "cpm": q(spend * 1000 / D(impressions)) if impressions else ZERO,
                 }
             )
         return self.to_csv(
-            out, ["date", "campaign", "spend", "impressions", "clicks",
-                  "ctr_percent", "cpm"]
+            out, ["date", "campaign", "spend", "impressions", "clicks", "ctr_percent", "cpm"]
         )
 
     def publisher_report_csv(self, publisher_id: uuid.UUID, days: int = 30) -> str:
@@ -579,9 +589,7 @@ class AnalyticsService:
         rows = []
         for snapshot in self.snapshots(days):
             net = q(
-                D(snapshot.platform_revenue)
-                + D(snapshot.withdrawal_fees)
-                - D(snapshot.refunds)
+                D(snapshot.platform_revenue) + D(snapshot.withdrawal_fees) - D(snapshot.refunds)
             )
             rows.append(
                 {
@@ -597,8 +605,16 @@ class AnalyticsService:
             )
         return self.to_csv(
             rows,
-            ["date", "gross_ad_spend", "publisher_payout", "platform_revenue",
-             "refunds", "withdrawal_fees", "fraud_reversed", "net_revenue"],
+            [
+                "date",
+                "gross_ad_spend",
+                "publisher_payout",
+                "platform_revenue",
+                "refunds",
+                "withdrawal_fees",
+                "fraud_reversed",
+                "net_revenue",
+            ],
         )
 
 
@@ -606,7 +622,7 @@ def _csv_value(value: Any) -> str:
     if value is None:
         return ""
     if isinstance(value, Decimal):
-        return format(value, "f")   # never scientific notation in a report
+        return format(value, "f")  # never scientific notation in a report
     return str(value)
 
 

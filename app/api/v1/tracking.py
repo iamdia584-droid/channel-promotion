@@ -31,9 +31,7 @@ router = APIRouter(tags=["tracking"])
 
 
 @router.get("/t/{delivery_id}/{token}")
-def track(
-    db: DbSession, request: Request, delivery_id: uuid.UUID, token: str
-) -> Response:
+def track(db: DbSession, request: Request, delivery_id: uuid.UUID, token: str) -> Response:
     """Record the interaction, then redirect to the advertiser's destination."""
     delivery = db.get(AdDelivery, delivery_id)
     if delivery is None:
@@ -63,7 +61,9 @@ def track(
 
     fraud = FraudService(db)
     assessment = fraud.score_impression_event(
-        delivery, telegram_user_id=telegram_user_id, ip_hash=ip_hash,
+        delivery,
+        telegram_user_id=telegram_user_id,
+        ip_hash=ip_hash,
         user_agent_hash=ua_hash,
     )
 
@@ -101,9 +101,13 @@ def track(
 
     if assessment.score >= 31:
         fraud.record_event(
-            FraudSubject.CLICK, click.id if click else None, assessment,
-            publisher_id=delivery.publisher_id, campaign_id=delivery.campaign_id,
-            channel_id=delivery.channel_id, delivery_id=delivery.id,
+            FraudSubject.CLICK,
+            click.id if click else None,
+            assessment,
+            publisher_id=delivery.publisher_id,
+            campaign_id=delivery.campaign_id,
+            channel_id=delivery.channel_id,
+            delivery_id=delivery.id,
             action_taken="not_billed" if not result.billable else "billed_flagged",
         )
 

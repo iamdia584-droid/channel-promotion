@@ -65,14 +65,10 @@ class EarningsService:
             currency=earning.currency,
             legs=[
                 debit(AccountKind.PUBLISHER_PENDING, earning.net_amount, earning.publisher_id),
-                credit(
-                    AccountKind.PUBLISHER_CONFIRMED, earning.net_amount, earning.publisher_id
-                ),
+                credit(AccountKind.PUBLISHER_CONFIRMED, earning.net_amount, earning.publisher_id),
             ],
             idempotency_key=f"earning-confirm:{earning.id}",
-            description=(
-                f"Confirmed earnings for {earning.billable_impressions} impressions"
-            ),
+            description=(f"Confirmed earnings for {earning.billable_impressions} impressions"),
             publisher_id=earning.publisher_id,
             campaign_id=earning.campaign_id,
             delivery_id=earning.delivery_id,
@@ -159,9 +155,7 @@ class EarningsService:
         from app.services.impressions import ImpressionService
 
         impressions = self.session.scalars(
-            select(Impression).where(
-                Impression.settlement_batch_id == earning.settlement_batch_id
-            )
+            select(Impression).where(Impression.settlement_batch_id == earning.settlement_batch_id)
         ).all()
         service = ImpressionService(self.session)
         for impression in impressions:
@@ -195,9 +189,9 @@ class EarningsService:
 
         impressions = int(
             self.session.scalar(
-                select(
-                    func.coalesce(func.sum(PublisherEarning.billable_impressions), 0)
-                ).where(PublisherEarning.publisher_id == publisher_id)
+                select(func.coalesce(func.sum(PublisherEarning.billable_impressions), 0)).where(
+                    PublisherEarning.publisher_id == publisher_id
+                )
             )
             or 0
         )

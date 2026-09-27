@@ -71,12 +71,12 @@ def test_signal_scores_are_clamped():
 def test_publisher_clicking_their_own_ad_is_caught(db, sent_delivery):
     """Spec §16: self-generated impressions."""
     delivery, campaign, channel, advertiser = sent_delivery()
-    publisher_user = db.get(
-        User, db.get(type(channel.publisher), channel.publisher_id).user_id
-    )
+    publisher_user = db.get(User, db.get(type(channel.publisher), channel.publisher_id).user_id)
     assessment = FraudService(db).score_impression_event(
-        delivery, telegram_user_id=publisher_user.telegram_user_id,
-        user_agent_hash="ua", ip_hash="ip",
+        delivery,
+        telegram_user_id=publisher_user.telegram_user_id,
+        user_agent_hash="ua",
+        ip_hash="ip",
     )
     assert assessment.band is FraudBand.HIGH_RISK
     assert "self_generated" in assessment.triggered()
@@ -98,7 +98,9 @@ def test_advertiser_clicking_their_own_ad_is_caught(db, sent_delivery):
 def test_an_ordinary_viewer_scores_clean(db, sent_delivery):
     delivery, *_ = sent_delivery()
     assessment = FraudService(db).score_impression_event(
-        delivery, telegram_user_id=987_654_321, user_agent_hash=hash_identity("Mozilla"),
+        delivery,
+        telegram_user_id=987_654_321,
+        user_agent_hash=hash_identity("Mozilla"),
         ip_hash=hash_identity("203.0.113.9"),
     )
     assert assessment.band is FraudBand.NORMAL
@@ -114,10 +116,13 @@ def test_many_users_behind_one_address_is_flagged(db, sent_delivery):
     shared_ip = hash_identity("198.51.100.7")
     for user in range(12):
         impressions.record(
-            delivery, kind=ImpressionKind.MEASURED,
+            delivery,
+            kind=ImpressionKind.MEASURED,
             source=ImpressionSource.TRACKING_LINK,
-            dedupe_key=f"farm:{user}", telegram_user_id=user + 1,
-            ip_hash=shared_ip, user_agent_hash="ua",
+            dedupe_key=f"farm:{user}",
+            telegram_user_id=user + 1,
+            ip_hash=shared_ip,
+            user_agent_hash="ua",
         )
     assessment = FraudService(db).score_impression_event(
         delivery, telegram_user_id=99, ip_hash=shared_ip, user_agent_hash="ua"
@@ -130,7 +135,9 @@ def test_missing_user_agent_is_a_weak_signal_only(db, sent_delivery):
     """Absent UA is suspicious but must not by itself block billing."""
     delivery, *_ = sent_delivery()
     assessment = FraudService(db).score_impression_event(
-        delivery, telegram_user_id=5, ip_hash=hash_identity("1.2.3.4"),
+        delivery,
+        telegram_user_id=5,
+        ip_hash=hash_identity("1.2.3.4"),
         user_agent_hash=None,
     )
     assert "missing_user_agent" in assessment.triggered()
@@ -146,8 +153,12 @@ def test_impossible_velocity_is_detected(db, sent_delivery):
     delivery, campaign, channel, advertiser = sent_delivery(avg_views=1_000)
     now = utcnow()
     ImpressionService(db).record(
-        delivery, kind=ImpressionKind.MEASURED, source=ImpressionSource.TRACKING_LINK,
-        dedupe_key="burst", quantity=900, occurred_at=now,
+        delivery,
+        kind=ImpressionKind.MEASURED,
+        source=ImpressionSource.TRACKING_LINK,
+        dedupe_key="burst",
+        quantity=900,
+        occurred_at=now,
     )
     assessment = FraudService(db).score_impression_event(
         delivery, telegram_user_id=7, occurred_at=now, user_agent_hash="ua"
@@ -163,9 +174,12 @@ def test_repeat_identity_inside_the_dedupe_window_is_flagged(db, sent_delivery):
     impressions = ImpressionService(db)
     for i in range(3):
         impressions.record(
-            delivery, kind=ImpressionKind.MEASURED,
-            source=ImpressionSource.TRACKING_LINK, dedupe_key=f"rep:{i}",
-            telegram_user_id=4242, user_agent_hash="ua",
+            delivery,
+            kind=ImpressionKind.MEASURED,
+            source=ImpressionSource.TRACKING_LINK,
+            dedupe_key=f"rep:{i}",
+            telegram_user_id=4242,
+            user_agent_hash="ua",
         )
     assessment = FraudService(db).score_impression_event(
         delivery, telegram_user_id=4242, user_agent_hash="ua"
@@ -184,8 +198,7 @@ def test_member_inflation_is_detected(db, make_channel):
     assessment = FraudService(db).audit_channel(inflated)
     assert "member_inflation" in assessment.triggered()
     assert assessment.score >= 31
-    evidence = next(s for s in assessment.evidence["signals"]
-                    if s["name"] == "member_inflation")
+    evidence = next(s for s in assessment.evidence["signals"] if s["name"] == "member_inflation")
     assert evidence["evidence"]["members"] == 500_000
     assert evidence["evidence"]["avg_views"] == 2_000
 
@@ -201,15 +214,25 @@ def test_view_spike_is_detected(db, make_channel):
     channel = make_channel(members=50_000, avg_views=40_000)
     base = utcnow().date()
     for day in range(10):
-        db.add(ChannelStatDaily(
-            channel_id=channel.id, stat_date=base - timedelta(days=10 - day),
-            member_count=50_000, avg_views=2_000, median_views=2_000,
-        ))
+        db.add(
+            ChannelStatDaily(
+                channel_id=channel.id,
+                stat_date=base - timedelta(days=10 - day),
+                member_count=50_000,
+                avg_views=2_000,
+                median_views=2_000,
+            )
+        )
     # Yesterday's views jump 20x.
-    db.add(ChannelStatDaily(
-        channel_id=channel.id, stat_date=base, member_count=50_000,
-        avg_views=40_000, median_views=40_000,
-    ))
+    db.add(
+        ChannelStatDaily(
+            channel_id=channel.id,
+            stat_date=base,
+            member_count=50_000,
+            avg_views=40_000,
+            median_views=40_000,
+        )
+    )
     db.flush()
     assessment = FraudService(db).audit_channel(channel)
     assert "view_spike" in assessment.triggered()
@@ -218,7 +241,7 @@ def test_view_spike_is_detected(db, make_channel):
 def test_implausible_ctr_is_detected(db, make_channel):
     channel = make_channel(members=50_000, avg_views=20_000)
     channel.total_impressions = 10_000
-    channel.total_clicks = 6_000          # 60% CTR is not real
+    channel.total_clicks = 6_000  # 60% CTR is not real
     db.flush()
     assessment = FraudService(db).audit_channel(channel)
     assert "implausible_ctr" in assessment.triggered()
@@ -228,15 +251,25 @@ def test_member_growth_spike_is_detected(db, make_channel):
     channel = make_channel(members=100_000, avg_views=30_000)
     base = utcnow().date()
     for day in range(6):
-        db.add(ChannelStatDaily(
-            channel_id=channel.id, stat_date=base - timedelta(days=day),
-            member_count=100_000, member_delta=200, avg_views=30_000,
-        ))
+        db.add(
+            ChannelStatDaily(
+                channel_id=channel.id,
+                stat_date=base - timedelta(days=day),
+                member_count=100_000,
+                member_delta=200,
+                avg_views=30_000,
+            )
+        )
     # 40k members appear in one day.
-    db.add(ChannelStatDaily(
-        channel_id=channel.id, stat_date=base - timedelta(days=7),
-        member_count=100_000, member_delta=40_000, avg_views=30_000,
-    ))
+    db.add(
+        ChannelStatDaily(
+            channel_id=channel.id,
+            stat_date=base - timedelta(days=7),
+            member_count=100_000,
+            member_delta=40_000,
+            avg_views=30_000,
+        )
+    )
     db.flush()
     assessment = FraudService(db).audit_channel(channel)
     assert "member_growth_spike" in assessment.triggered()
@@ -246,12 +279,16 @@ def test_audit_persists_the_score_for_admin_inspection(db, make_channel):
     channel = make_channel(members=500_000, avg_views=1_000)
     assessment = FraudService(db).audit_channel(channel)
     assert channel.fraud_score == assessment.score
-    row = db.query(FraudScore).filter(
-        FraudScore.subject_type == FraudSubject.CHANNEL,
-        FraudScore.subject_id == channel.id,
-    ).one()
+    row = (
+        db.query(FraudScore)
+        .filter(
+            FraudScore.subject_type == FraudSubject.CHANNEL,
+            FraudScore.subject_id == channel.id,
+        )
+        .one()
+    )
     assert row.score == assessment.score
-    assert row.signals["signals"]      # evidence is inspectable
+    assert row.signals["signals"]  # evidence is inspectable
 
 
 def test_thresholds_are_configurable_not_hardcoded(db, make_channel):
@@ -282,8 +319,11 @@ def test_flagged_scores_are_recorded_with_full_evidence(db, make_channel):
     service = FraudService(db)
     assessment = service.audit_channel(channel)
     event = service.record_event(
-        FraudSubject.CHANNEL, channel.id, assessment,
-        publisher_id=channel.publisher_id, channel_id=channel.id,
+        FraudSubject.CHANNEL,
+        channel.id,
+        assessment,
+        publisher_id=channel.publisher_id,
+        channel_id=channel.id,
         amount_at_risk="1234.50",
     )
     assert event is not None
@@ -291,6 +331,7 @@ def test_flagged_scores_are_recorded_with_full_evidence(db, make_channel):
     assert event.amount_at_risk == Decimal("1234.500000")
     assert event.evidence["signals"]
     import json
+
     json.dumps(event.evidence)
 
 
@@ -313,9 +354,13 @@ def test_sweep_flags_suspicious_deliveries(db, sent_delivery):
     concentrated = hash_identity("198.51.100.200")
     for i in range(60):
         impressions.record(
-            delivery, kind=ImpressionKind.MEASURED,
-            source=ImpressionSource.TRACKING_LINK, dedupe_key=f"sw:{i}",
-            telegram_user_id=i, ip_hash=concentrated, user_agent_hash="ua",
+            delivery,
+            kind=ImpressionKind.MEASURED,
+            source=ImpressionSource.TRACKING_LINK,
+            dedupe_key=f"sw:{i}",
+            telegram_user_id=i,
+            ip_hash=concentrated,
+            user_agent_hash="ua",
         )
     events = FraudService(db).sweep_deliveries()
     assert len(events) == 1
@@ -330,9 +375,12 @@ def test_clean_deliveries_are_not_flagged_by_the_sweep(db, sent_delivery):
     impressions = ImpressionService(db)
     for i in range(60):
         impressions.record(
-            delivery, kind=ImpressionKind.MEASURED,
-            source=ImpressionSource.TRACKING_LINK, dedupe_key=f"ok:{i}",
-            telegram_user_id=i, ip_hash=hash_identity(f"10.0.0.{i}"),
+            delivery,
+            kind=ImpressionKind.MEASURED,
+            source=ImpressionSource.TRACKING_LINK,
+            dedupe_key=f"ok:{i}",
+            telegram_user_id=i,
+            ip_hash=hash_identity(f"10.0.0.{i}"),
             user_agent_hash="ua",
         )
     assert FraudService(db).sweep_deliveries() == []

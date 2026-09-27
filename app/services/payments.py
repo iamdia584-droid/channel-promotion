@@ -21,7 +21,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errors import Conflict, NotFound, ValidationFailed
-from app.core.money import ZERO, D, q
+from app.core.money import ZERO, q
 from app.db.base import utcnow
 from app.models.enums import DepositStatus
 from app.models.identity import Advertiser
@@ -195,8 +195,10 @@ class DepositService:
         self.session.flush()
 
         self.audit.financial(
-            actor, "deposit.confirmed",
-            target_type="deposit", target_id=deposit.id,
+            actor,
+            "deposit.confirmed",
+            target_type="deposit",
+            target_id=deposit.id,
             ledger_transaction_id=txn.id,
             old_value={"status": str(old_status)},
             new_value={"status": str(deposit.status), "net_amount": str(deposit.net_amount)},
@@ -210,15 +212,15 @@ class DepositService:
         deposit.failure_reason = reason[:300]
         self.session.flush()
         self.audit.log(
-            actor or Actor.system(), "deposit.failed",
-            target_type="deposit", target_id=deposit.id,
+            actor or Actor.system(),
+            "deposit.failed",
+            target_type="deposit",
+            target_id=deposit.id,
             new_value={"reason": reason},
         )
         return deposit
 
-    def list_for_advertiser(
-        self, advertiser_id: uuid.UUID, limit: int = 50
-    ) -> list[Deposit]:
+    def list_for_advertiser(self, advertiser_id: uuid.UUID, limit: int = 50) -> list[Deposit]:
         return list(
             self.session.scalars(
                 select(Deposit)

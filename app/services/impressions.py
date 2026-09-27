@@ -111,8 +111,7 @@ class ImpressionService:
         if channel is None:  # pragma: no cover
             raise NotFound("channel not found")
 
-        status, reason = self._validate(delivery, channel, kind, quantity, occurred_at,
-                                       fraud_score)
+        status, reason = self._validate(delivery, channel, kind, quantity, occurred_at, fraud_score)
 
         unit_cost = cpm_cost(1, delivery.effective_cpm)
         unit_publisher, _ = split_commission(unit_cost, delivery.commission_rate)
@@ -152,16 +151,22 @@ class ImpressionService:
                 self.session.add(impression)
                 self.session.flush()
         except IntegrityError:
-            return RecordResult(None, False, ValidationStatus.DUPLICATE,
-                                "dedupe_key already recorded")
+            return RecordResult(
+                None, False, ValidationStatus.DUPLICATE, "dedupe_key already recorded"
+            )
 
         self._apply_counters(delivery, channel, impression)
         self.session.flush()
         return RecordResult(impression, True, status, reason)
 
     def _validate(
-        self, delivery: AdDelivery, channel: PublisherChannel,
-        kind: ImpressionKind, quantity: int, occurred_at, fraud_score: int,
+        self,
+        delivery: AdDelivery,
+        channel: PublisherChannel,
+        kind: ImpressionKind,
+        quantity: int,
+        occurred_at,
+        fraud_score: int,
     ) -> tuple[ValidationStatus, str]:
         if not kind.billable_by_default:
             return ValidationStatus.INVALIDATED, f"{kind.value} impressions are never billable"
@@ -169,15 +174,19 @@ class ImpressionService:
         # A view-counter impression only bills where the channel is configured
         # for it — otherwise we'd be billing a number we cannot corroborate.
         if kind is ImpressionKind.TELEGRAM_REPORTED and channel.measurement_mode not in (
-            MeasurementMode.VIEW_COUNTER, MeasurementMode.HYBRID
+            MeasurementMode.VIEW_COUNTER,
+            MeasurementMode.HYBRID,
         ):
             return (
                 ValidationStatus.INVALIDATED,
                 "channel measurement mode does not permit view-counter billing",
             )
 
-        if delivery.status in (DeliveryStatus.CANCELLED, DeliveryStatus.REVERSED,
-                              DeliveryStatus.FAILED):
+        if delivery.status in (
+            DeliveryStatus.CANCELLED,
+            DeliveryStatus.REVERSED,
+            DeliveryStatus.FAILED,
+        ):
             return ValidationStatus.INVALIDATED, f"delivery is {delivery.status.value}"
 
         if delivery.sent_at is None:
@@ -234,8 +243,9 @@ class ImpressionService:
         previous = int(delivery.reported_views_high_water or 0)
         delta = int(cumulative_views) - previous
         if delta <= 0:
-            return RecordResult(None, False, ValidationStatus.DUPLICATE,
-                                "no new views above the high-water mark")
+            return RecordResult(
+                None, False, ValidationStatus.DUPLICATE, "no new views above the high-water mark"
+            )
         delivery.reported_views_high_water = int(cumulative_views)
         result = self.record(
             delivery,
@@ -243,8 +253,11 @@ class ImpressionService:
             source=ImpressionSource.VIEW_COUNTER,
             dedupe_key=f"view:{delivery.id}:{cumulative_views}",
             quantity=delta,
-            meta={"source": source_name, "cumulative": int(cumulative_views),
-                  "previous_high_water": previous},
+            meta={
+                "source": source_name,
+                "cumulative": int(cumulative_views),
+                "previous_high_water": previous,
+            },
         )
         if not result.accepted:
             # Roll the ratchet back so a genuine later poll is not silently lost.
@@ -343,7 +356,7 @@ class ImpressionService:
             return impression
         impression.billable = False
         impression.validation_status = status
-        impression.fraud_reasons = list(impression.fraud_reasons or []) + [reason]
+        impression.fraud_reasons = [*(impression.fraud_reasons or []), reason]
         delivery = self.session.get(AdDelivery, impression.delivery_id)
         if delivery is not None:
             delivery.billable_impressions = max(

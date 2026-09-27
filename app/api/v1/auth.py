@@ -48,7 +48,8 @@ def login_with_telegram(
         raise Unauthenticated("initData carries no user id")
 
     user = get_or_create_user(
-        db, telegram_id,
+        db,
+        telegram_id,
         username=raw.get("username"),
         first_name=raw.get("first_name"),
         last_name=raw.get("last_name"),
@@ -71,8 +72,11 @@ def whoami(principal: CurrentPrincipal) -> SessionOut:
     if user is None:
         raise Unauthenticated("no user on this session")
     return SessionOut(
-        token="", user_id=str(user.id), telegram_user_id=user.telegram_user_id,
-        display_name=user.display_name, roles=sorted(r.value for r in user.roles),
+        token="",
+        user_id=str(user.id),
+        telegram_user_id=user.telegram_user_id,
+        display_name=user.display_name,
+        roles=sorted(r.value for r in user.roles),
     )
 
 
@@ -90,8 +94,11 @@ def enable_role(db: DbSession, principal: CurrentPrincipal, body: RoleIn) -> Ses
     else:
         ensure_publisher(db, user)
     return SessionOut(
-        token="", user_id=str(user.id), telegram_user_id=user.telegram_user_id,
-        display_name=user.display_name, roles=sorted(r.value for r in user.roles),
+        token="",
+        user_id=str(user.id),
+        telegram_user_id=user.telegram_user_id,
+        display_name=user.display_name,
+        roles=sorted(r.value for r in user.roles),
     )
 
 
@@ -101,22 +108,29 @@ def enable_role(db: DbSession, principal: CurrentPrincipal, body: RoleIn) -> Ses
 
 
 def get_or_create_user(
-    db, telegram_user_id: int, *, username=None, first_name=None,
-    last_name=None, language_code=None, signup_source: str = "telegram",
+    db,
+    telegram_user_id: int,
+    *,
+    username=None,
+    first_name=None,
+    last_name=None,
+    language_code=None,
+    signup_source: str = "telegram",
 ) -> User:
     """Look a user up by Telegram id, never by username (spec §2).
 
     A username can be changed or transferred; the numeric id is permanent, so it
     is the only safe internal identity.
     """
-    user = db.scalars(
-        select(User).where(User.telegram_user_id == telegram_user_id)
-    ).one_or_none()
+    user = db.scalars(select(User).where(User.telegram_user_id == telegram_user_id)).one_or_none()
     if user is None:
         user = User(
-            telegram_user_id=telegram_user_id, username=username,
-            first_name=first_name, last_name=last_name,
-            language_code=language_code, signup_source=signup_source,
+            telegram_user_id=telegram_user_id,
+            username=username,
+            first_name=first_name,
+            last_name=last_name,
+            language_code=language_code,
+            signup_source=signup_source,
         )
         db.add(user)
     else:
@@ -133,9 +147,7 @@ def get_or_create_user(
 def ensure_advertiser(db, user: User) -> Advertiser:
     from app.core.config import settings
 
-    advertiser = db.scalars(
-        select(Advertiser).where(Advertiser.user_id == user.id)
-    ).one_or_none()
+    advertiser = db.scalars(select(Advertiser).where(Advertiser.user_id == user.id)).one_or_none()
     if advertiser is None:
         advertiser = Advertiser(user_id=user.id, currency=settings.default_currency)
         db.add(advertiser)
@@ -149,9 +161,7 @@ def ensure_advertiser(db, user: User) -> Advertiser:
 def ensure_publisher(db, user: User) -> Publisher:
     from app.core.config import settings
 
-    publisher = db.scalars(
-        select(Publisher).where(Publisher.user_id == user.id)
-    ).one_or_none()
+    publisher = db.scalars(select(Publisher).where(Publisher.user_id == user.id)).one_or_none()
     if publisher is None:
         publisher = Publisher(user_id=user.id, currency=settings.default_currency)
         db.add(publisher)

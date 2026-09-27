@@ -101,15 +101,24 @@ class ChannelService:
         try:
             info = self.gateway.get_chat(identifier)
         except ChatNotFound:
-            self._record_attempt(publisher, identifier, None, VerificationStatus.UNVERIFIED,
-                                 {"error": "chat_not_found", "submitted": identifier})
+            self._record_attempt(
+                publisher,
+                identifier,
+                None,
+                VerificationStatus.UNVERIFIED,
+                {"error": "chat_not_found", "submitted": identifier},
+            )
             raise NotFound(
-                "I can't see that chat. Check the username, and make sure I've been "
-                "added to it."
+                "I can't see that chat. Check the username, and make sure I've been added to it."
             ) from None
         except TelegramError as exc:
-            self._record_attempt(publisher, identifier, None, VerificationStatus.UNVERIFIED,
-                                 {"error": str(exc), "submitted": identifier})
+            self._record_attempt(
+                publisher,
+                identifier,
+                None,
+                VerificationStatus.UNVERIFIED,
+                {"error": str(exc), "submitted": identifier},
+            )
             raise
 
         if info.chat_type not in SUPPORTED_TYPES:
@@ -329,7 +338,7 @@ def _normalise(identifier: str) -> str:
         return ""
     for prefix in ("https://t.me/", "http://t.me/", "t.me/", "telegram.me/"):
         if value.lower().startswith(prefix):
-            value = value[len(prefix):]
+            value = value[len(prefix) :]
             break
     value = value.split("?")[0].strip("/")
     if value.startswith("@"):

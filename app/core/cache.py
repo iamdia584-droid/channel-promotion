@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import contextlib
 import time
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 import redis
 
@@ -50,10 +51,9 @@ def lock(key: str, ttl: int = 30, blocking: float = 0.0) -> Iterator[None]:
     try:
         yield
     finally:
-        try:
+        # If Redis is unreachable the lock simply expires on its own TTL.
+        with contextlib.suppress(redis.RedisError):
             client.eval(_UNLOCK, 1, full, token)
-        except redis.RedisError:  # pragma: no cover - lock expires on its own
-            pass
 
 
 # Sliding-window counter. Atomic so concurrent requests cannot both slip through.
@@ -96,16 +96,13 @@ def cache_get(key: str) -> str | None:
 
 
 def cache_set(key: str, value: str, ttl: int = 60) -> None:
-    try:
+    # Caching is an optimisation; losing a write is never a correctness problem.
+    with contextlib.suppress(redis.RedisError):
         get_redis().setex(key, ttl, value)
-    except redis.RedisError:
-        pass
 
 
 def cache_delete(*keys: str) -> None:
     if not keys:
         return
-    try:
+    with contextlib.suppress(redis.RedisError):
         get_redis().delete(*keys)
-    except redis.RedisError:
-        pass

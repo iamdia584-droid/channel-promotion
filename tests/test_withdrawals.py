@@ -45,9 +45,7 @@ def earning_publisher(db, sent_delivery):
     def _make(impressions=20_000, bid_cpm="100", commission="0.20"):
         from app.models.enums import ImpressionKind, ImpressionSource
 
-        SettingsService(db).set(
-            "hour_weights", "[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]"
-        )
+        SettingsService(db).set("hour_weights", "[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]")
         delivery, campaign, channel, advertiser = sent_delivery(
             bid_cpm=bid_cpm, avg_views=100_000, budget="400000", commission=commission
         )
@@ -56,9 +54,11 @@ def earning_publisher(db, sent_delivery):
         base = impressions // rows
         for i in range(rows):
             service.record(
-                delivery, kind=ImpressionKind.MEASURED,
+                delivery,
+                kind=ImpressionKind.MEASURED,
                 source=ImpressionSource.TRACKING_LINK,
-                dedupe_key=f"w:{delivery.id}:{i}", quantity=base,
+                dedupe_key=f"w:{delivery.id}:{i}",
+                quantity=base,
                 telegram_user_id=5000 + i,
             )
         SettlementService(db).settle_delivery(delivery)
@@ -112,9 +112,9 @@ def test_tampered_destination_is_detected(db, make_publisher):
     [
         (PayoutMethod.BKASH, "01712345678", True),
         (PayoutMethod.BKASH, "+8801712345678", True),
-        (PayoutMethod.BKASH, "1712345678", False),      # missing leading 0
-        (PayoutMethod.NAGAD, "0171234567", False),      # 10 digits
-        (PayoutMethod.ROCKET, "02712345678", False),    # not 01
+        (PayoutMethod.BKASH, "1712345678", False),  # missing leading 0
+        (PayoutMethod.NAGAD, "0171234567", False),  # 10 digits
+        (PayoutMethod.ROCKET, "02712345678", False),  # not 01
         (PayoutMethod.BANK, "12345678901", True),
         (PayoutMethod.BANK, "123", False),
     ],
@@ -152,8 +152,11 @@ def test_pending_earnings_cannot_be_withdrawn(db, sent_delivery):
 
     delivery, campaign, channel, advertiser = sent_delivery(avg_views=20_000)
     ImpressionService(db).record(
-        delivery, kind=ImpressionKind.MEASURED, source=ImpressionSource.TRACKING_LINK,
-        dedupe_key="p1", quantity=5_000,
+        delivery,
+        kind=ImpressionKind.MEASURED,
+        source=ImpressionSource.TRACKING_LINK,
+        dedupe_key="p1",
+        quantity=5_000,
     )
     SettlementService(db).settle_delivery(delivery)
     wallet = WalletService(db).for_publisher(delivery.publisher_id)
@@ -179,7 +182,7 @@ def test_withdrawal_deducts_confirmed_balance_immediately(db, earning_publisher)
     withdrawal = WithdrawalService(db).request(publisher_id, "1000", method.id)
 
     assert withdrawal.amount == Decimal("1000.000000")
-    assert withdrawal.fee == Decimal("20.000000")      # 10 flat + 1% of 1000
+    assert withdrawal.fee == Decimal("20.000000")  # 10 flat + 1% of 1000
     assert withdrawal.net_amount == Decimal("980.000000")
     assert withdrawal.status is WithdrawalStatus.PENDING
     assert withdrawal.destination_masked == "01******678"
@@ -397,7 +400,7 @@ def test_fraud_hold_blocks_processing_until_reviewed(db, earning_publisher, make
     publisher_id, _ = earning_publisher()
     s = SettingsService(db)
     s.set("min_withdrawal", "10.000000")
-    s.set("fraud_hold_earnings_threshold", "1")     # force a hold
+    s.set("fraud_hold_earnings_threshold", "1")  # force a hold
     method = _method(db, publisher_id)
     service = WithdrawalService(db)
     withdrawal = service.request(publisher_id, "500", method.id)
@@ -418,8 +421,7 @@ def test_shared_payout_destination_raises_the_fraud_score(db, earning_publisher,
 
     withdrawal = service.request(publisher_id, "500", method.id)
     assert withdrawal.fraud_score > 30
-    signals = str(db.query(__import__("app.models.ops", fromlist=["FraudScore"])
-                           .FraudScore).all())
+    signals = str(db.query(__import__("app.models.ops", fromlist=["FraudScore"]).FraudScore).all())
     assert signals is not None
 
 

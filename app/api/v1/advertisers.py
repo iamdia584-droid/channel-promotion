@@ -21,7 +21,7 @@ from app.schemas.campaigns import (
     CampaignStats,
     PauseIn,
 )
-from app.schemas.common import Acknowledged, MoneyInput, Page, TransactionOut, WalletOut
+from app.schemas.common import MoneyInput, Page, TransactionOut, WalletOut
 from app.services.analytics import AnalyticsService
 from app.services.campaigns import CampaignDraft, CampaignService
 from app.services.payments import DepositService
@@ -52,15 +52,16 @@ def list_transactions(
     rows = service.statement(wallet.id, limit=limit, offset=offset)
     return Page[TransactionOut](
         items=[TransactionOut.model_validate(r) for r in rows],
-        total=len(rows) + offset, limit=limit, offset=offset,
+        total=len(rows) + offset,
+        limit=limit,
+        offset=offset,
     )
 
 
-@router.post("/me/deposits", status_code=201,
-             dependencies=[throttle("deposit", limit=10, window=3600)])
-def initiate_deposit(
-    db: DbSession, advertiser: CurrentAdvertiser, body: MoneyInput
-) -> dict:
+@router.post(
+    "/me/deposits", status_code=201, dependencies=[throttle("deposit", limit=10, window=3600)]
+)
+def initiate_deposit(db: DbSession, advertiser: CurrentAdvertiser, body: MoneyInput) -> dict:
     """Start a deposit. Crediting happens only on a verified provider callback."""
     deposit, instructions = DepositService(db).initiate(advertiser.id, body.amount)
     return {
@@ -75,8 +76,12 @@ def initiate_deposit(
 # --- campaigns ------------------------------------------------------------
 
 
-@router.post("/me/campaigns", response_model=CampaignOut, status_code=201,
-             dependencies=[throttle("campaign_create", limit=30, window=3600)])
+@router.post(
+    "/me/campaigns",
+    response_model=CampaignOut,
+    status_code=201,
+    dependencies=[throttle("campaign_create", limit=30, window=3600)],
+)
 def create_campaign(
     db: DbSession,
     advertiser: CurrentAdvertiser,
@@ -137,7 +142,9 @@ def list_campaigns(
     rows = CampaignService(db).list_for_advertiser(advertiser.id, limit, offset)
     return Page[CampaignOut](
         items=[CampaignOut.model_validate(c) for c in rows],
-        total=len(rows) + offset, limit=limit, offset=offset,
+        total=len(rows) + offset,
+        limit=limit,
+        offset=offset,
     )
 
 
@@ -145,9 +152,7 @@ def list_campaigns(
 def get_campaign(
     db: DbSession, advertiser: CurrentAdvertiser, campaign_id: uuid.UUID
 ) -> CampaignOut:
-    return CampaignOut.model_validate(
-        CampaignService(db).get_owned(campaign_id, advertiser.id)
-    )
+    return CampaignOut.model_validate(CampaignService(db).get_owned(campaign_id, advertiser.id))
 
 
 @router.get("/me/campaigns/{campaign_id}/preview", response_model=CampaignPreview)
@@ -161,7 +166,9 @@ def preview_campaign(
 
 @router.post("/me/campaigns/{campaign_id}/submit", response_model=CampaignOut)
 def submit_campaign(
-    db: DbSession, advertiser: CurrentAdvertiser, principal: CurrentPrincipal,
+    db: DbSession,
+    advertiser: CurrentAdvertiser,
+    principal: CurrentPrincipal,
     campaign_id: uuid.UUID,
 ) -> CampaignOut:
     service = CampaignService(db)
@@ -171,19 +178,22 @@ def submit_campaign(
 
 @router.post("/me/campaigns/{campaign_id}/pause", response_model=CampaignOut)
 def pause_campaign(
-    db: DbSession, advertiser: CurrentAdvertiser, principal: CurrentPrincipal,
-    campaign_id: uuid.UUID, body: PauseIn,
+    db: DbSession,
+    advertiser: CurrentAdvertiser,
+    principal: CurrentPrincipal,
+    campaign_id: uuid.UUID,
+    body: PauseIn,
 ) -> CampaignOut:
     service = CampaignService(db)
     campaign = service.get_owned(campaign_id, advertiser.id)
-    return CampaignOut.model_validate(
-        service.pause(campaign, body.reason, principal.actor)
-    )
+    return CampaignOut.model_validate(service.pause(campaign, body.reason, principal.actor))
 
 
 @router.post("/me/campaigns/{campaign_id}/resume", response_model=CampaignOut)
 def resume_campaign(
-    db: DbSession, advertiser: CurrentAdvertiser, principal: CurrentPrincipal,
+    db: DbSession,
+    advertiser: CurrentAdvertiser,
+    principal: CurrentPrincipal,
     campaign_id: uuid.UUID,
 ) -> CampaignOut:
     service = CampaignService(db)
@@ -193,7 +203,9 @@ def resume_campaign(
 
 @router.post("/me/campaigns/{campaign_id}/cancel")
 def cancel_campaign(
-    db: DbSession, advertiser: CurrentAdvertiser, principal: CurrentPrincipal,
+    db: DbSession,
+    advertiser: CurrentAdvertiser,
+    principal: CurrentPrincipal,
     campaign_id: uuid.UUID,
 ) -> dict:
     """Cancel and refund the unspent reservation (spec §35)."""
@@ -218,7 +230,9 @@ def campaign_stats(
 
 @router.get("/me/campaigns/{campaign_id}/breakdown")
 def campaign_breakdown(
-    db: DbSession, advertiser: CurrentAdvertiser, campaign_id: uuid.UUID,
+    db: DbSession,
+    advertiser: CurrentAdvertiser,
+    campaign_id: uuid.UUID,
     by: str = Query("publisher", pattern="^(publisher|country|category)$"),
 ) -> dict:
     CampaignService(db).get_owned(campaign_id, advertiser.id)
@@ -231,15 +245,16 @@ def campaign_breakdown(
 
 @router.post("/me/campaigns/{campaign_id}/refunds", status_code=201)
 def request_refund(
-    db: DbSession, advertiser: CurrentAdvertiser, principal: CurrentPrincipal,
-    campaign_id: uuid.UUID, idempotency_key: IdempotencyKey = None,
+    db: DbSession,
+    advertiser: CurrentAdvertiser,
+    principal: CurrentPrincipal,
+    campaign_id: uuid.UUID,
+    idempotency_key: IdempotencyKey = None,
 ) -> dict:
     campaign = CampaignService(db).get_owned(campaign_id, advertiser.id)
     service = RefundService(db)
     quote = service.quote(campaign)
-    refund = service.request(
-        campaign, idempotency_key=idempotency_key, actor=principal.actor
-    )
+    refund = service.request(campaign, idempotency_key=idempotency_key, actor=principal.actor)
     return {
         "refund_id": str(refund.id),
         "status": refund.status.value,
@@ -249,9 +264,7 @@ def request_refund(
 
 
 @router.get("/me/campaigns/{campaign_id}/refund-quote")
-def refund_quote(
-    db: DbSession, advertiser: CurrentAdvertiser, campaign_id: uuid.UUID
-) -> dict:
+def refund_quote(db: DbSession, advertiser: CurrentAdvertiser, campaign_id: uuid.UUID) -> dict:
     campaign = CampaignService(db).get_owned(campaign_id, advertiser.id)
     return RefundService(db).quote(campaign).explain()
 
@@ -268,8 +281,9 @@ def overview(db: DbSession, advertiser: CurrentAdvertiser) -> dict:
 def daily(
     db: DbSession, advertiser: CurrentAdvertiser, days: int = Query(30, ge=1, le=365)
 ) -> dict:
-    return {"rows": [_stringify(r)
-                     for r in AnalyticsService(db).advertiser_daily(advertiser.id, days)]}
+    return {
+        "rows": [_stringify(r) for r in AnalyticsService(db).advertiser_daily(advertiser.id, days)]
+    }
 
 
 @router.get("/me/report.csv", response_class=Response)
@@ -278,7 +292,8 @@ def report_csv(
 ) -> Response:
     csv_text = AnalyticsService(db).advertiser_report_csv(advertiser.id, days)
     return Response(
-        content=csv_text, media_type="text/csv",
+        content=csv_text,
+        media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=advertiser-report.csv"},
     )
 

@@ -139,8 +139,10 @@ class RefundService:
         self.session.add(refund)
         self.session.flush()
         self.audit.log(
-            actor or Actor.system("advertiser-request"), "refund.requested",
-            target_type="refund", target_id=refund.id,
+            actor or Actor.system("advertiser-request"),
+            "refund.requested",
+            target_type="refund",
+            target_id=refund.id,
             new_value={"requested": str(requested), "campaign_id": str(campaign.id)},
             reason=reason,
         )
@@ -187,9 +189,7 @@ class RefundService:
             actor_id=actor.id,
         )
         if not result.replayed:
-            wallet = self.wallets.locked(
-                self.wallets.for_advertiser(refund.advertiser_id).id
-            )
+            wallet = self.wallets.locked(self.wallets.for_advertiser(refund.advertiser_id).id)
             wallet.reserved_balance = q(D(wallet.reserved_balance) - approved)
             wallet.available_balance = q(D(wallet.available_balance) + approved)
             wallet.refunded_total = q(D(wallet.refunded_total) + approved)
@@ -206,7 +206,10 @@ class RefundService:
         self.session.flush()
 
         self.audit.financial(
-            actor, "refund.approved", target_type="refund", target_id=refund.id,
+            actor,
+            "refund.approved",
+            target_type="refund",
+            target_id=refund.id,
             ledger_transaction_id=result.id,
             old_value={"status": "requested"},
             new_value={"status": "processed", "approved": str(approved)},
@@ -225,8 +228,12 @@ class RefundService:
         refund.decision_note = note[:500]
         self.session.flush()
         self.audit.log(
-            actor, "refund.rejected", target_type="refund", target_id=refund.id,
-            new_value={"status": "rejected"}, reason=note,
+            actor,
+            "refund.rejected",
+            target_type="refund",
+            target_id=refund.id,
+            new_value={"status": "rejected"},
+            reason=note,
         )
         return refund
 
@@ -249,14 +256,20 @@ class RefundService:
         refund: Refund | None = None
         if quote.refundable > ZERO:
             refund = self.request(
-                campaign, amount=quote.refundable, reason=reason,
-                idempotency_key=f"refund:cancel:{campaign.id}", actor=actor,
+                campaign,
+                amount=quote.refundable,
+                reason=reason,
+                idempotency_key=f"refund:cancel:{campaign.id}",
+                actor=actor,
             )
             # Auto-approve: this is the advertiser's own unspent money.
             refund = self.approve(refund, actor, note="automatic on cancellation")
 
         self.audit.log(
-            actor, "campaign.cancelled", target_type="campaign", target_id=campaign.id,
+            actor,
+            "campaign.cancelled",
+            target_type="campaign",
+            target_id=campaign.id,
             old_value={"status": str(old_status)},
             new_value={
                 "status": "cancelled",

@@ -10,7 +10,8 @@ Event names are exactly those listed in spec §30.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -62,7 +63,8 @@ class Event:
 
 
 Event.ALL = frozenset(
-    value for key, value in vars(Event).items()
+    value
+    for key, value in vars(Event).items()
     if not key.startswith("_") and isinstance(value, str)
 )
 
@@ -137,8 +139,9 @@ def _jsonable(payload: dict) -> dict:
         elif isinstance(value, dict):
             out[key] = _jsonable(value)
         elif isinstance(value, (list, tuple)):
-            out[key] = [v if isinstance(v, (str, int, bool)) or v is None else str(v)
-                        for v in value]
+            out[key] = [
+                v if isinstance(v, (str, int, bool)) or v is None else str(v) for v in value
+            ]
         else:
             out[key] = str(value)
     return out

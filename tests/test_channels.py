@@ -41,9 +41,7 @@ def test_submitting_someone_elses_channel_is_rejected(db, service, gateway, make
     assert service.list_for_publisher(publisher.id) == []
 
 
-def test_bot_not_admin_is_rejected_with_actionable_guidance(
-    db, service, gateway, make_publisher
-):
+def test_bot_not_admin_is_rejected_with_actionable_guidance(db, service, gateway, make_publisher):
     publisher = make_publisher()
     gateway.register_chat(
         -1002, username="noadmin", bot_admin=False, owner_id=_owner_tg(db, publisher)
@@ -53,9 +51,7 @@ def test_bot_not_admin_is_rejected_with_actionable_guidance(
     assert "administrator" in result.user_message()
 
 
-def test_admin_without_post_rights_is_rejected_for_channels(
-    db, service, gateway, make_publisher
-):
+def test_admin_without_post_rights_is_rejected_for_channels(db, service, gateway, make_publisher):
     from app.services.telegram_gateway import MemberInfo
 
     publisher = make_publisher()
@@ -91,17 +87,21 @@ def test_successful_registration_stores_the_facts_spec_requires(
     """Spec §4: store chat id, username, title, type, member count, category…"""
     publisher = make_publisher()
     gateway.register_chat(
-        -100500, username="examchannel", title="Exam Prep",
-        members=42_000, owner_id=_owner_tg(db, publisher),
+        -100500,
+        username="examchannel",
+        title="Exam Prep",
+        members=42_000,
+        owner_id=_owner_tg(db, publisher),
     )
-    result = service.register(publisher, "@examchannel", category="education",
-                              language="bn", country="bd")
+    result = service.register(
+        publisher, "@examchannel", category="education", language="bn", country="bd"
+    )
     assert result.ok
     channel = result.channel
     assert channel.telegram_chat_id == -100500
     assert channel.category == "education"
-    assert channel.country == "BD"          # normalised upper
-    assert channel.language == "bn"         # normalised lower
+    assert channel.country == "BD"  # normalised upper
+    assert channel.language == "bn"  # normalised lower
     assert channel.verification_status is VerificationStatus.VERIFIED
     assert channel.verified_at is not None
     chat = db.get(TelegramChat, channel.telegram_chat_id_ref)
@@ -143,15 +143,14 @@ def test_unknown_chat_is_reported_not_registered(db, service, make_publisher):
     assert db.query(ChannelVerificationAttempt).count() == 1
 
 
-def test_another_publishers_channel_cannot_be_hijacked(
-    db, service, gateway, make_publisher
-):
+def test_another_publishers_channel_cannot_be_hijacked(db, service, gateway, make_publisher):
     first, second = make_publisher(), make_publisher()
     gateway.register_chat(-1008, username="taken", owner_id=_owner_tg(db, first))
     assert service.register(first, "@taken").ok
 
     # Make the second publisher a genuine admin too — still must not take it over.
     from app.services.telegram_gateway import MemberInfo
+
     gateway.members[(-1008, _owner_tg(db, second))] = MemberInfo(
         "administrator", user_id=_owner_tg(db, second)
     )
@@ -186,8 +185,9 @@ def test_blacklisted_chat_is_refused(db, service, gateway, make_publisher):
 
 def test_private_chat_type_is_refused(db, service, gateway, make_publisher):
     publisher = make_publisher()
-    gateway.register_chat(1011, username="dm", chat_type="private",
-                          owner_id=_owner_tg(db, publisher))
+    gateway.register_chat(
+        1011, username="dm", chat_type="private", owner_id=_owner_tg(db, publisher)
+    )
     with pytest.raises(ValidationFailed, match="cannot be registered"):
         service.register(publisher, "@dm")
 
@@ -218,8 +218,9 @@ def test_losing_bot_rights_pauses_inventory_without_destroying_it(
     assert channel.status is ChannelStatus.ACTIVE
 
     # Publisher removes the bot as admin.
-    gateway.members[(-1014, gateway.bot_id)] = MemberInfo("member", is_bot=True,
-                                                          user_id=gateway.bot_id)
+    gateway.members[(-1014, gateway.bot_id)] = MemberInfo(
+        "member", is_bot=True, user_id=gateway.bot_id
+    )
     service.revalidate(channel)
     assert channel.verification_status is VerificationStatus.REVOKED
     assert channel.status is ChannelStatus.PAUSED

@@ -32,8 +32,7 @@ def D(value: object) -> Decimal:
         raise MoneyError(f"bool is not a monetary value: {value!r}")
     if isinstance(value, float):
         raise MoneyError(
-            f"float is not permitted in financial arithmetic: {value!r}. "
-            "Pass a str or Decimal."
+            f"float is not permitted in financial arithmetic: {value!r}. Pass a str or Decimal."
         )
     if isinstance(value, int):
         return Decimal(value)

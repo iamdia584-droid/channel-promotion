@@ -19,10 +19,10 @@ from app.models.enums import (
 )
 from app.models.identity import Advertiser, Publisher, User
 from app.models.money import Withdrawal
-from app.models.ops import AuditLog, FraudCase, FraudEvent, PricingRule
+from app.models.ops import FraudCase, FraudEvent, PricingRule
 from app.models.telegram import PublisherChannel, TelegramChat
 from app.schemas.campaigns import CampaignOut, RejectIn
-from app.schemas.common import Acknowledged, MoneyInput, Page, Schema
+from app.schemas.common import Acknowledged, MoneyInput, Schema
 from app.schemas.publishers import WithdrawalOut
 from app.services.analytics import AnalyticsService
 from app.services.audit import Actor, AuditService
@@ -72,7 +72,10 @@ def moderation_queue(db: DbSession, staff: RequireStaff) -> list[CampaignOut]:
 
 @router.post("/campaigns/{campaign_id}/approve", response_model=CampaignOut)
 def approve_campaign(
-    db: DbSession, staff: RequireStaff, request: Request, campaign_id: uuid.UUID,
+    db: DbSession,
+    staff: RequireStaff,
+    request: Request,
+    campaign_id: uuid.UUID,
     note: str | None = None,
 ) -> CampaignOut:
     campaign = db.get(Campaign, campaign_id)
@@ -85,7 +88,10 @@ def approve_campaign(
 
 @router.post("/campaigns/{campaign_id}/reject", response_model=CampaignOut)
 def reject_campaign(
-    db: DbSession, staff: RequireStaff, request: Request, campaign_id: uuid.UUID,
+    db: DbSession,
+    staff: RequireStaff,
+    request: Request,
+    campaign_id: uuid.UUID,
     body: RejectIn,
 ) -> CampaignOut:
     campaign = db.get(Campaign, campaign_id)
@@ -98,7 +104,10 @@ def reject_campaign(
 
 @router.post("/campaigns/{campaign_id}/suspend", response_model=CampaignOut)
 def suspend_campaign(
-    db: DbSession, staff: RequireAdmin, request: Request, campaign_id: uuid.UUID,
+    db: DbSession,
+    staff: RequireAdmin,
+    request: Request,
+    campaign_id: uuid.UUID,
     body: RejectIn,
 ) -> CampaignOut:
     campaign = db.get(Campaign, campaign_id)
@@ -119,9 +128,11 @@ class ChannelDecisionIn(Schema):
 
 @router.get("/channels")
 def list_channels(
-    db: DbSession, staff: RequireStaff,
+    db: DbSession,
+    staff: RequireStaff,
     status: ChannelStatus | None = None,
-    limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ) -> dict:
     stmt = select(PublisherChannel).order_by(PublisherChannel.created_at.desc())
     if status is not None:
@@ -150,7 +161,10 @@ def list_channels(
 
 @router.post("/channels/{channel_id}/status", response_model=Acknowledged)
 def set_channel_status(
-    db: DbSession, staff: RequireStaff, request: Request, channel_id: uuid.UUID,
+    db: DbSession,
+    staff: RequireStaff,
+    request: Request,
+    channel_id: uuid.UUID,
     body: ChannelDecisionIn,
 ) -> Acknowledged:
     channel = db.get(PublisherChannel, channel_id)
@@ -161,25 +175,34 @@ def set_channel_status(
     channel.rejection_reason = body.reason
     db.flush()
     AuditService(db).log(
-        _actor(request, staff), "channel.status_changed",
-        target_type="channel", target_id=channel.id,
-        old_value={"status": str(old)}, new_value={"status": str(body.status)},
+        _actor(request, staff),
+        "channel.status_changed",
+        target_type="channel",
+        target_id=channel.id,
+        old_value={"status": str(old)},
+        new_value={"status": str(body.status)},
         reason=body.reason,
     )
     from app.services.notifications import NotificationService
 
     if body.status is ChannelStatus.SUSPENDED:
         NotificationService(db).queue_for_publisher(
-            channel.publisher_id, "channel_suspended",
-            {"channel_title": channel.chat.title if channel.chat else "your channel",
-             "reason": body.reason or "contact support"},
+            channel.publisher_id,
+            "channel_suspended",
+            {
+                "channel_title": channel.chat.title if channel.chat else "your channel",
+                "reason": body.reason or "contact support",
+            },
         )
     return Acknowledged(message=f"channel is now {body.status.value}")
 
 
 @router.post("/channels/{channel_id}/blacklist", response_model=Acknowledged)
 def blacklist_chat(
-    db: DbSession, staff: RequireAdmin, request: Request, channel_id: uuid.UUID,
+    db: DbSession,
+    staff: RequireAdmin,
+    request: Request,
+    channel_id: uuid.UUID,
     body: RejectIn,
 ) -> Acknowledged:
     channel = db.get(PublisherChannel, channel_id)
@@ -191,8 +214,12 @@ def blacklist_chat(
     channel.status = ChannelStatus.SUSPENDED
     db.flush()
     AuditService(db).log(
-        _actor(request, staff), "chat.blacklisted", target_type="telegram_chat",
-        target_id=chat.id, new_value={"is_blacklisted": True}, reason=body.reason,
+        _actor(request, staff),
+        "chat.blacklisted",
+        target_type="telegram_chat",
+        target_id=chat.id,
+        new_value={"is_blacklisted": True},
+        reason=body.reason,
     )
     return Acknowledged(message="chat blacklisted")
 
@@ -202,8 +229,10 @@ def blacklist_chat(
 
 @router.get("/users")
 def list_users(
-    db: DbSession, staff: RequireStaff,
-    limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0),
+    db: DbSession,
+    staff: RequireStaff,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ) -> dict:
     rows = db.scalars(
         select(User).order_by(User.created_at.desc()).limit(limit).offset(offset)
@@ -231,7 +260,10 @@ class SuspendIn(Schema):
 
 @router.post("/advertisers/{advertiser_id}/suspend", response_model=Acknowledged)
 def suspend_advertiser(
-    db: DbSession, staff: RequireAdmin, request: Request, advertiser_id: uuid.UUID,
+    db: DbSession,
+    staff: RequireAdmin,
+    request: Request,
+    advertiser_id: uuid.UUID,
     body: SuspendIn,
 ) -> Acknowledged:
     advertiser = db.get(Advertiser, advertiser_id)
@@ -240,15 +272,22 @@ def suspend_advertiser(
     advertiser.status = UserStatus.SUSPENDED
     db.flush()
     AuditService(db).log(
-        _actor(request, staff), "advertiser.suspended", target_type="advertiser",
-        target_id=advertiser.id, new_value={"status": "suspended"}, reason=body.reason,
+        _actor(request, staff),
+        "advertiser.suspended",
+        target_type="advertiser",
+        target_id=advertiser.id,
+        new_value={"status": "suspended"},
+        reason=body.reason,
     )
     return Acknowledged(message="advertiser suspended")
 
 
 @router.post("/publishers/{publisher_id}/suspend", response_model=Acknowledged)
 def suspend_publisher(
-    db: DbSession, staff: RequireAdmin, request: Request, publisher_id: uuid.UUID,
+    db: DbSession,
+    staff: RequireAdmin,
+    request: Request,
+    publisher_id: uuid.UUID,
     body: SuspendIn,
 ) -> Acknowledged:
     publisher = db.get(Publisher, publisher_id)
@@ -257,8 +296,12 @@ def suspend_publisher(
     publisher.status = UserStatus.SUSPENDED
     db.flush()
     AuditService(db).log(
-        _actor(request, staff), "publisher.suspended", target_type="publisher",
-        target_id=publisher.id, new_value={"status": "suspended"}, reason=body.reason,
+        _actor(request, staff),
+        "publisher.suspended",
+        target_type="publisher",
+        target_id=publisher.id,
+        new_value={"status": "suspended"},
+        reason=body.reason,
     )
     return Acknowledged(message="publisher suspended")
 
@@ -276,8 +319,11 @@ def reinstate(
     row.status = UserStatus.ACTIVE
     db.flush()
     AuditService(db).log(
-        _actor(request, staff), f"{party[:-1]}.reinstated", target_type=party[:-1],
-        target_id=row.id, new_value={"status": "active"},
+        _actor(request, staff),
+        f"{party[:-1]}.reinstated",
+        target_type=party[:-1],
+        target_id=row.id,
+        new_value={"status": "active"},
     )
     return Acknowledged(message="reinstated")
 
@@ -324,9 +370,7 @@ def confirm_deposit(
 
 @router.get("/withdrawals/queue", response_model=list[WithdrawalOut])
 def withdrawal_queue(db: DbSession, staff: RequireStaff) -> list[WithdrawalOut]:
-    return [
-        WithdrawalOut.model_validate(w) for w in WithdrawalService(db).pending_queue()
-    ]
+    return [WithdrawalOut.model_validate(w) for w in WithdrawalService(db).pending_queue()]
 
 
 class PayoutIn(Schema):
@@ -345,20 +389,24 @@ def start_processing(
 
 @router.post("/withdrawals/{withdrawal_id}/paid", response_model=WithdrawalOut)
 def mark_paid(
-    db: DbSession, staff: RequireAdmin, request: Request, withdrawal_id: uuid.UUID,
+    db: DbSession,
+    staff: RequireAdmin,
+    request: Request,
+    withdrawal_id: uuid.UUID,
     body: PayoutIn,
 ) -> WithdrawalOut:
     withdrawal = _withdrawal(db, withdrawal_id)
     return WithdrawalOut.model_validate(
-        WithdrawalService(db).mark_paid(
-            withdrawal, _actor(request, staff), body.provider_reference
-        )
+        WithdrawalService(db).mark_paid(withdrawal, _actor(request, staff), body.provider_reference)
     )
 
 
 @router.post("/withdrawals/{withdrawal_id}/reject", response_model=WithdrawalOut)
 def reject_withdrawal(
-    db: DbSession, staff: RequireAdmin, request: Request, withdrawal_id: uuid.UUID,
+    db: DbSession,
+    staff: RequireAdmin,
+    request: Request,
+    withdrawal_id: uuid.UUID,
     body: RejectIn,
 ) -> WithdrawalOut:
     withdrawal = _withdrawal(db, withdrawal_id)
@@ -419,24 +467,32 @@ def refund_queue(db: DbSession, staff: RequireStaff) -> dict:
 
 @router.post("/refunds/{refund_id}/approve")
 def approve_refund(
-    db: DbSession, staff: RequireAdmin, request: Request, refund_id: uuid.UUID,
-    amount: str | None = None, note: str | None = None,
+    db: DbSession,
+    staff: RequireAdmin,
+    request: Request,
+    refund_id: uuid.UUID,
+    amount: str | None = None,
+    note: str | None = None,
 ) -> dict:
     from app.models.money import Refund
 
     refund = db.get(Refund, refund_id)
     if refund is None:
         raise NotFound("refund not found")
-    refund = RefundService(db).approve(
-        refund, _actor(request, staff), amount=amount, note=note
-    )
-    return {"refund_id": str(refund.id), "status": refund.status.value,
-            "approved": format(refund.approved_amount, "f")}
+    refund = RefundService(db).approve(refund, _actor(request, staff), amount=amount, note=note)
+    return {
+        "refund_id": str(refund.id),
+        "status": refund.status.value,
+        "approved": format(refund.approved_amount, "f"),
+    }
 
 
 @router.post("/refunds/{refund_id}/reject")
 def reject_refund(
-    db: DbSession, staff: RequireAdmin, request: Request, refund_id: uuid.UUID,
+    db: DbSession,
+    staff: RequireAdmin,
+    request: Request,
+    refund_id: uuid.UUID,
     body: RejectIn,
 ) -> dict:
     from app.models.money import Refund
@@ -497,19 +553,23 @@ def manual_adjustment(
     # A credit to the user is funded from (or returned to) the platform's cash
     # position, so the books stay balanced either way.
     legs = (
-        [debit(AccountKind.GATEWAY_CLEARING, magnitude),
-         credit(account, magnitude, body.party_id)]
+        [debit(AccountKind.GATEWAY_CLEARING, magnitude), credit(account, magnitude, body.party_id)]
         if amount > 0
-        else [debit(account, magnitude, body.party_id),
-              credit(AccountKind.GATEWAY_CLEARING, magnitude)]
+        else [
+            debit(account, magnitude, body.party_id),
+            credit(AccountKind.GATEWAY_CLEARING, magnitude),
+        ]
     )
     result = ledger.post(
         transaction_type=TransactionType.MANUAL_ADJUSTMENT,
-        currency=wallet.currency, legs=legs, idempotency_key=key,
+        currency=wallet.currency,
+        legs=legs,
+        idempotency_key=key,
         description=f"Manual adjustment: {body.reason}",
         advertiser_id=body.party_id if body.party == "advertiser" else None,
         publisher_id=body.party_id if body.party == "publisher" else None,
-        actor_type="staff", actor_id=str(staff.id),
+        actor_type="staff",
+        actor_id=str(staff.id),
     )
     if body.party == "advertiser":
         old = q(wallet.available_balance)
@@ -523,15 +583,20 @@ def manual_adjustment(
     db.flush()
 
     AuditService(db).financial(
-        _actor(request, staff), "balance.adjusted",
-        target_type=body.party, target_id=body.party_id,
+        _actor(request, staff),
+        "balance.adjusted",
+        target_type=body.party,
+        target_id=body.party_id,
         ledger_transaction_id=result.id,
-        old_value={"balance": str(old)}, new_value={"balance": str(new)},
+        old_value={"balance": str(old)},
+        new_value={"balance": str(new)},
         reason=body.reason,
     )
     return {
-        "party": body.party, "party_id": str(body.party_id),
-        "old_balance": format(old, "f"), "new_balance": format(new, "f"),
+        "party": body.party,
+        "party_id": str(body.party_id),
+        "old_balance": format(old, "f"),
+        "new_balance": format(new, "f"),
         "ledger_transaction_id": str(result.id),
     }
 
@@ -541,40 +606,49 @@ def manual_adjustment(
 
 @router.get("/fraud/events")
 def fraud_events(
-    db: DbSession, staff: RequireStaff,
-    limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0),
+    db: DbSession,
+    staff: RequireStaff,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ) -> dict:
     rows = db.scalars(
-        select(FraudEvent).order_by(FraudEvent.occurred_at.desc())
-        .limit(limit).offset(offset)
+        select(FraudEvent).order_by(FraudEvent.occurred_at.desc()).limit(limit).offset(offset)
     ).all()
     return {
         "items": [
             {
-                "id": str(e.id), "subject_type": e.subject_type.value,
+                "id": str(e.id),
+                "subject_type": e.subject_type.value,
                 "subject_id": str(e.subject_id) if e.subject_id else None,
-                "signal": e.signal, "score": e.score, "band": e.band.value,
+                "signal": e.signal,
+                "score": e.score,
+                "band": e.band.value,
                 "amount_at_risk": format(e.amount_at_risk, "f"),
-                "evidence": e.evidence, "occurred_at": e.occurred_at.isoformat(),
+                "evidence": e.evidence,
+                "occurred_at": e.occurred_at.isoformat(),
             }
             for e in rows
         ],
-        "limit": limit, "offset": offset,
+        "limit": limit,
+        "offset": offset,
     }
 
 
 @router.get("/fraud/cases")
 def fraud_cases(db: DbSession, staff: RequireStaff) -> dict:
-    rows = db.scalars(
-        select(FraudCase).order_by(FraudCase.created_at.desc()).limit(100)
-    ).all()
+    rows = db.scalars(select(FraudCase).order_by(FraudCase.created_at.desc()).limit(100)).all()
     return {
         "items": [
             {
-                "id": str(c.id), "subject_type": c.subject_type.value,
-                "subject_id": str(c.subject_id), "status": c.status.value,
-                "score": c.score, "band": c.band.value, "summary": c.summary,
-                "amount_held": format(c.amount_held, "f"), "evidence": c.evidence,
+                "id": str(c.id),
+                "subject_type": c.subject_type.value,
+                "subject_id": str(c.subject_id),
+                "status": c.status.value,
+                "score": c.score,
+                "band": c.band.value,
+                "summary": c.summary,
+                "amount_held": format(c.amount_held, "f"),
+                "evidence": c.evidence,
             }
             for c in rows
         ]
@@ -587,8 +661,11 @@ def audit_channel(db: DbSession, staff: RequireStaff, channel_id: uuid.UUID) -> 
     if channel is None:
         raise NotFound("channel not found")
     assessment = FraudService(db).audit_channel(channel)
-    return {"score": assessment.score, "band": assessment.band.value,
-            "evidence": assessment.evidence}
+    return {
+        "score": assessment.score,
+        "band": assessment.band.value,
+        "evidence": assessment.evidence,
+    }
 
 
 # --- pricing and settings -------------------------------------------------
@@ -609,8 +686,12 @@ def set_setting(
 ) -> Acknowledged:
     old, new = SettingsService(db).set(key, body.value, staff_id=staff.id)
     AuditService(db).log(
-        _actor(request, staff), "setting.changed", target_type="system_setting",
-        target_id=key, old_value={"value": old}, new_value={"value": new},
+        _actor(request, staff),
+        "setting.changed",
+        target_type="system_setting",
+        target_id=key,
+        old_value={"value": old},
+        new_value={"value": new},
     )
     return Acknowledged(message=f"{key} set to {new}")
 
@@ -634,13 +715,18 @@ def list_pricing_rules(db: DbSession, staff: RequireAdmin) -> dict:
     return {
         "items": [
             {
-                "id": str(r.id), "scope": r.scope.value, "scope_value": r.scope_value,
+                "id": str(r.id),
+                "scope": r.scope.value,
+                "scope_value": r.scope_value,
                 "multiplier": str(r.multiplier),
                 "commission_rate_override": str(r.commission_rate_override)
-                if r.commission_rate_override is not None else None,
+                if r.commission_rate_override is not None
+                else None,
                 "min_cpm": format(r.min_cpm, "f") if r.min_cpm is not None else None,
                 "max_cpm": format(r.max_cpm, "f") if r.max_cpm is not None else None,
-                "currency": r.currency, "active": r.active, "note": r.note,
+                "currency": r.currency,
+                "active": r.active,
+                "note": r.note,
             }
             for r in rows
         ]
@@ -652,16 +738,26 @@ def upsert_pricing_rule(
     db: DbSession, staff: RequireAdmin, request: Request, body: PricingRuleIn
 ) -> Acknowledged:
     rule = PricingService(db).upsert_rule(
-        body.scope, body.scope_value, multiplier=body.multiplier,
+        body.scope,
+        body.scope_value,
+        multiplier=body.multiplier,
         commission_rate_override=body.commission_rate_override,
-        min_cpm=body.min_cpm, max_cpm=body.max_cpm, currency=body.currency,
-        note=body.note, staff_id=staff.id,
+        min_cpm=body.min_cpm,
+        max_cpm=body.max_cpm,
+        currency=body.currency,
+        note=body.note,
+        staff_id=staff.id,
     )
     AuditService(db).log(
-        _actor(request, staff), "pricing_rule.upserted", target_type="pricing_rule",
+        _actor(request, staff),
+        "pricing_rule.upserted",
+        target_type="pricing_rule",
         target_id=rule.id,
-        new_value={"scope": body.scope.value, "scope_value": body.scope_value,
-                   "multiplier": body.multiplier},
+        new_value={
+            "scope": body.scope.value,
+            "scope_value": body.scope_value,
+            "multiplier": body.multiplier,
+        },
     )
     return Acknowledged(message="pricing rule saved")
 
@@ -678,9 +774,12 @@ def deactivate_pricing_rule(
     rule.active = False
     db.flush()
     AuditService(db).log(
-        _actor(request, staff), "pricing_rule.deactivated",
-        target_type="pricing_rule", target_id=rule.id,
-        old_value={"active": True}, new_value={"active": False},
+        _actor(request, staff),
+        "pricing_rule.deactivated",
+        target_type="pricing_rule",
+        target_id=rule.id,
+        old_value={"active": True},
+        new_value={"active": False},
     )
     return Acknowledged(message="pricing rule deactivated")
 
@@ -690,26 +789,35 @@ def deactivate_pricing_rule(
 
 @router.get("/audit")
 def audit_log(
-    db: DbSession, staff: RequireAdmin,
+    db: DbSession,
+    staff: RequireAdmin,
     financial_only: bool = False,
-    limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
 ) -> dict:
     rows = AuditService(db).recent(limit, offset, financial_only)
     return {
         "items": [
             {
-                "id": str(a.id), "actor_type": a.actor_type, "actor": a.actor_label,
-                "action": a.action, "target_type": a.target_type,
-                "target_id": a.target_id, "old_value": a.old_value,
-                "new_value": a.new_value, "reason": a.reason,
+                "id": str(a.id),
+                "actor_type": a.actor_type,
+                "actor": a.actor_label,
+                "action": a.action,
+                "target_type": a.target_type,
+                "target_id": a.target_id,
+                "old_value": a.old_value,
+                "new_value": a.new_value,
+                "reason": a.reason,
                 "is_financial": a.is_financial,
                 "ledger_transaction_id": str(a.ledger_transaction_id)
-                if a.ledger_transaction_id else None,
+                if a.ledger_transaction_id
+                else None,
                 "created_at": a.created_at.isoformat(),
             }
             for a in rows
         ],
-        "limit": limit, "offset": offset,
+        "limit": limit,
+        "offset": offset,
     }
 
 

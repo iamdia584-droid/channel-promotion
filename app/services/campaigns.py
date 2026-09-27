@@ -148,17 +148,23 @@ class CampaignService:
         )
         for channel_id in draft.specific_channel_ids or []:
             self.session.add(
-                CampaignPublisher(
-                    campaign_id=campaign.id, channel_id=channel_id, allowed=True
-                )
+                CampaignPublisher(campaign_id=campaign.id, channel_id=channel_id, allowed=True)
             )
         advertiser.campaigns_created += 1
         self.session.flush()
 
-        emit(self.session, Event.CAMPAIGN_CREATED,
-             {"campaign_id": campaign.id, "advertiser_id": advertiser.id,
-              "name": campaign.name, "total_budget": campaign.total_budget},
-             aggregate_type="campaign", aggregate_id=campaign.id)
+        emit(
+            self.session,
+            Event.CAMPAIGN_CREATED,
+            {
+                "campaign_id": campaign.id,
+                "advertiser_id": advertiser.id,
+                "name": campaign.name,
+                "total_budget": campaign.total_budget,
+            },
+            aggregate_type="campaign",
+            aggregate_id=campaign.id,
+        )
         return campaign
 
     def _validate(self, draft: CampaignDraft) -> None:
@@ -220,9 +226,7 @@ class CampaignService:
     def _validate_url(url: str) -> None:
         cleaned = url.strip()
         if not cleaned.lower().startswith(ALLOWED_SCHEMES):
-            raise ValidationFailed(
-                "the destination URL must start with https:// or http://"
-            )
+            raise ValidationFailed("the destination URL must start with https:// or http://")
         if len(cleaned) > 2000:
             raise ValidationFailed("the destination URL is too long")
         # A URL containing whitespace or control characters is malformed and is a
@@ -260,31 +264,42 @@ class CampaignService:
                 target_type=ReviewTarget.CAMPAIGN,
                 target_id=campaign.id,
                 decision=ReviewDecision.PENDING,
-                checklist={"text": False, "media": False, "url": False,
-                           "category": False, "targeting": False},
+                checklist={
+                    "text": False,
+                    "media": False,
+                    "url": False,
+                    "category": False,
+                    "targeting": False,
+                },
             )
         )
-        emit(self.session, Event.AD_SUBMITTED, {"campaign_id": campaign.id},
-             aggregate_type="campaign", aggregate_id=campaign.id)
+        emit(
+            self.session,
+            Event.AD_SUBMITTED,
+            {"campaign_id": campaign.id},
+            aggregate_type="campaign",
+            aggregate_id=campaign.id,
+        )
 
         if self.settings.bool_("campaign_auto_approve"):
-            return self.approve(campaign, actor or Actor.system("auto-approve"),
-                                note="auto-approved by configuration")
+            return self.approve(
+                campaign,
+                actor or Actor.system("auto-approve"),
+                note="auto-approved by configuration",
+            )
         return campaign
 
-    def approve(
-        self, campaign: Campaign, actor: Actor, note: str | None = None
-    ) -> Campaign:
+    def approve(self, campaign: Campaign, actor: Actor, note: str | None = None) -> Campaign:
         """Approve, reserve the budget, and start delivering if in window."""
-        if campaign.status not in (
-            CampaignStatus.SUBMITTED, CampaignStatus.UNDER_REVIEW
-        ):
+        if campaign.status not in (CampaignStatus.SUBMITTED, CampaignStatus.UNDER_REVIEW):
             raise Conflict(f"a {campaign.status.value} campaign cannot be approved")
 
         old = campaign.status
         # Reserve now: from here on the money is committed to this campaign.
         self.wallets.reserve_budget(
-            campaign.advertiser_id, campaign.id, campaign.total_budget,
+            campaign.advertiser_id,
+            campaign.id,
+            campaign.total_budget,
             idempotency_key=f"campaign-reserve:{campaign.id}",
             description=f"Budget reserved for campaign {campaign.name}",
         )
@@ -301,14 +316,24 @@ class CampaignService:
         self.session.flush()
 
         self.audit.log(
-            actor, "campaign.approved", target_type="campaign", target_id=campaign.id,
-            old_value={"status": str(old)}, new_value={"status": "approved"}, reason=note,
+            actor,
+            "campaign.approved",
+            target_type="campaign",
+            target_id=campaign.id,
+            old_value={"status": str(old)},
+            new_value={"status": "approved"},
+            reason=note,
         )
-        emit(self.session, Event.CAMPAIGN_APPROVED,
-             {"campaign_id": campaign.id, "name": campaign.name},
-             aggregate_type="campaign", aggregate_id=campaign.id)
+        emit(
+            self.session,
+            Event.CAMPAIGN_APPROVED,
+            {"campaign_id": campaign.id, "name": campaign.name},
+            aggregate_type="campaign",
+            aggregate_id=campaign.id,
+        )
         self.notify.queue_for_advertiser(
-            campaign.advertiser_id, "campaign_approved",
+            campaign.advertiser_id,
+            "campaign_approved",
             {"campaign_name": campaign.name},
             dedupe_key=f"campaign_approved:{campaign.id}",
         )
@@ -319,9 +344,7 @@ class CampaignService:
         return campaign
 
     def reject(self, campaign: Campaign, actor: Actor, reason: str) -> Campaign:
-        if campaign.status not in (
-            CampaignStatus.SUBMITTED, CampaignStatus.UNDER_REVIEW
-        ):
+        if campaign.status not in (CampaignStatus.SUBMITTED, CampaignStatus.UNDER_REVIEW):
             raise Conflict(f"a {campaign.status.value} campaign cannot be rejected")
         if not reason.strip():
             raise ValidationFailed("a rejection reason is required")
@@ -337,14 +360,24 @@ class CampaignService:
         self.session.flush()
 
         self.audit.log(
-            actor, "campaign.rejected", target_type="campaign", target_id=campaign.id,
-            old_value={"status": str(old)}, new_value={"status": "rejected"}, reason=reason,
+            actor,
+            "campaign.rejected",
+            target_type="campaign",
+            target_id=campaign.id,
+            old_value={"status": str(old)},
+            new_value={"status": "rejected"},
+            reason=reason,
         )
-        emit(self.session, Event.CAMPAIGN_REJECTED,
-             {"campaign_id": campaign.id, "reason": reason},
-             aggregate_type="campaign", aggregate_id=campaign.id)
+        emit(
+            self.session,
+            Event.CAMPAIGN_REJECTED,
+            {"campaign_id": campaign.id, "reason": reason},
+            aggregate_type="campaign",
+            aggregate_id=campaign.id,
+        )
         self.notify.queue_for_advertiser(
-            campaign.advertiser_id, "campaign_rejected",
+            campaign.advertiser_id,
+            "campaign_rejected",
             {"campaign_name": campaign.name, "reason": reason},
             dedupe_key=f"campaign_rejected:{campaign.id}",
         )
@@ -366,7 +399,7 @@ class CampaignService:
         review.staff_id = _staff_id(actor)
         review.reason = (note or "")[:500] or None
         review.decided_at = utcnow()
-        review.checklist = {k: True for k in (review.checklist or {})}
+        review.checklist = dict.fromkeys(review.checklist or {}, True)
 
     # ------------------------------------------------------------------
     # Running state
@@ -378,17 +411,25 @@ class CampaignService:
         campaign.status = CampaignStatus.RUNNING
         campaign.paused_reason = None
         self.session.flush()
-        emit(self.session, Event.CAMPAIGN_STARTED, {"campaign_id": campaign.id},
-             aggregate_type="campaign", aggregate_id=campaign.id)
+        emit(
+            self.session,
+            Event.CAMPAIGN_STARTED,
+            {"campaign_id": campaign.id},
+            aggregate_type="campaign",
+            aggregate_id=campaign.id,
+        )
         self.notify.queue_for_advertiser(
-            campaign.advertiser_id, "campaign_started",
+            campaign.advertiser_id,
+            "campaign_started",
             {"campaign_name": campaign.name},
             dedupe_key=f"campaign_started:{campaign.id}",
         )
         return campaign
 
     def pause(
-        self, campaign: Campaign, reason: str = "paused by advertiser",
+        self,
+        campaign: Campaign,
+        reason: str = "paused by advertiser",
         actor: Actor | None = None,
     ) -> Campaign:
         if campaign.status is not CampaignStatus.RUNNING:
@@ -397,14 +438,23 @@ class CampaignService:
         campaign.paused_reason = reason[:300]
         self.session.flush()
         self.audit.log(
-            actor or Actor.system(), "campaign.paused", target_type="campaign",
-            target_id=campaign.id, new_value={"status": "paused"}, reason=reason,
+            actor or Actor.system(),
+            "campaign.paused",
+            target_type="campaign",
+            target_id=campaign.id,
+            new_value={"status": "paused"},
+            reason=reason,
         )
-        emit(self.session, Event.CAMPAIGN_PAUSED,
-             {"campaign_id": campaign.id, "reason": reason},
-             aggregate_type="campaign", aggregate_id=campaign.id)
+        emit(
+            self.session,
+            Event.CAMPAIGN_PAUSED,
+            {"campaign_id": campaign.id, "reason": reason},
+            aggregate_type="campaign",
+            aggregate_id=campaign.id,
+        )
         self.notify.queue_for_advertiser(
-            campaign.advertiser_id, "campaign_paused",
+            campaign.advertiser_id,
+            "campaign_paused",
             {"campaign_name": campaign.name, "reason": reason},
         )
         return campaign
@@ -419,8 +469,13 @@ class CampaignService:
         campaign.status = CampaignStatus.RUNNING
         campaign.paused_reason = None
         self.session.flush()
-        emit(self.session, Event.CAMPAIGN_RESUMED, {"campaign_id": campaign.id},
-             aggregate_type="campaign", aggregate_id=campaign.id)
+        emit(
+            self.session,
+            Event.CAMPAIGN_RESUMED,
+            {"campaign_id": campaign.id},
+            aggregate_type="campaign",
+            aggregate_id=campaign.id,
+        )
         return campaign
 
     def suspend(self, campaign: Campaign, actor: Actor, reason: str) -> Campaign:
@@ -434,8 +489,13 @@ class CampaignService:
             ad.status = AdStatus.SUSPENDED
         self.session.flush()
         self.audit.log(
-            actor, "campaign.suspended", target_type="campaign", target_id=campaign.id,
-            old_value={"status": str(old)}, new_value={"status": "suspended"}, reason=reason,
+            actor,
+            "campaign.suspended",
+            target_type="campaign",
+            target_id=campaign.id,
+            old_value={"status": str(old)},
+            new_value={"status": "suspended"},
+            reason=reason,
         )
         return campaign
 
@@ -454,15 +514,27 @@ class CampaignService:
             campaign.status = CampaignStatus.COMPLETED
             campaign.completed_at = now
             closed += 1
-            emit(self.session, Event.CAMPAIGN_COMPLETED,
-                 {"campaign_id": campaign.id, "impressions": campaign.billable_impressions,
-                  "spent": campaign.spent_amount, "currency": campaign.currency},
-                 aggregate_type="campaign", aggregate_id=campaign.id)
+            emit(
+                self.session,
+                Event.CAMPAIGN_COMPLETED,
+                {
+                    "campaign_id": campaign.id,
+                    "impressions": campaign.billable_impressions,
+                    "spent": campaign.spent_amount,
+                    "currency": campaign.currency,
+                },
+                aggregate_type="campaign",
+                aggregate_id=campaign.id,
+            )
             self.notify.queue_for_advertiser(
-                campaign.advertiser_id, "campaign_completed",
-                {"campaign_name": campaign.name,
-                 "impressions": campaign.billable_impressions,
-                 "spent": str(q(campaign.spent_amount)), "currency": campaign.currency},
+                campaign.advertiser_id,
+                "campaign_completed",
+                {
+                    "campaign_name": campaign.name,
+                    "impressions": campaign.billable_impressions,
+                    "spent": str(q(campaign.spent_amount)),
+                    "currency": campaign.currency,
+                },
                 dedupe_key=f"campaign_completed:{campaign.id}",
             )
         self.session.flush()
@@ -513,11 +585,7 @@ class CampaignService:
         return list(
             self.session.scalars(
                 select(Campaign)
-                .where(
-                    Campaign.status.in_(
-                        [CampaignStatus.SUBMITTED, CampaignStatus.UNDER_REVIEW]
-                    )
-                )
+                .where(Campaign.status.in_([CampaignStatus.SUBMITTED, CampaignStatus.UNDER_REVIEW]))
                 .order_by(Campaign.created_at)
                 .limit(limit)
             ).all()
@@ -541,9 +609,9 @@ class CampaignService:
         ).all()
         ratio = D(threshold_ratio)
         return [
-            c for c in rows
-            if q(c.total_budget) > ZERO
-            and q(c.remaining_budget) / q(c.total_budget) <= ratio
+            c
+            for c in rows
+            if q(c.total_budget) > ZERO and q(c.remaining_budget) / q(c.total_budget) <= ratio
         ]
 
     def stats(self, campaign: Campaign) -> dict[str, object]:
@@ -556,7 +624,8 @@ class CampaignService:
                     AdDelivery.campaign_id == campaign.id,
                     AdDelivery.sent_at.is_not(None),
                 )
-            ) or 0
+            )
+            or 0
         )
         channels = int(
             self.session.scalar(
@@ -564,7 +633,8 @@ class CampaignService:
                     AdDelivery.campaign_id == campaign.id,
                     AdDelivery.sent_at.is_not(None),
                 )
-            ) or 0
+            )
+            or 0
         )
         impressions = campaign.billable_impressions
         spent = q(campaign.spent_amount)

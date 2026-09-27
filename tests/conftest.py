@@ -17,7 +17,7 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production")
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
-import pytest  # noqa: E402  (must follow the env defaults above)
+import pytest
 
 #: Set ``TEST_DATABASE_URL`` to a PostgreSQL DSN to run the suite against the real
 #: database. Strongly preferred for the financial tests: SQLite has no NUMERIC
@@ -31,7 +31,7 @@ ON_POSTGRES = TEST_DATABASE_URL.startswith("postgresql")
 requires_postgres = pytest.mark.skipif(
     not ON_POSTGRES,
     reason="needs PostgreSQL: SQLite stores NUMERIC as float and cannot enforce "
-           "exact-decimal CHECK constraints (set TEST_DATABASE_URL)",
+    "exact-decimal CHECK constraints (set TEST_DATABASE_URL)",
 )
 
 from sqlalchemy import create_engine, event, text
@@ -415,8 +415,9 @@ def delivery_engine(db, gateway_fixture):
 
 
 @pytest.fixture
-def sent_delivery(db, gateway_fixture, delivery_engine, make_campaign, make_channel, funded,
-                  make_advertiser):
+def sent_delivery(
+    db, gateway_fixture, delivery_engine, make_campaign, make_channel, funded, make_advertiser
+):
     """A campaign delivered into a channel, ready to receive impressions."""
 
     def _make(*, bid_cpm="100", avg_views=20_000, budget="50000", commission="0.20", **kw):
@@ -427,8 +428,9 @@ def sent_delivery(db, gateway_fixture, delivery_engine, make_campaign, make_chan
         s.set("quality_multiplier_floor", "1.0000")
         s.set("quality_multiplier_ceiling", "1.0000")
         advertiser = funded(make_advertiser(), "200000")
-        campaign = make_campaign(advertiser, bid_cpm=bid_cpm, total_budget=budget,
-                                 daily_budget=budget, **kw)
+        campaign = make_campaign(
+            advertiser, bid_cpm=bid_cpm, total_budget=budget, daily_budget=budget, **kw
+        )
         channel = make_channel(avg_views=avg_views)
         gateway_fixture.register_chat(channel.telegram_chat_id, username="c1")
         result = delivery_engine.deliver_to(channel)
@@ -473,7 +475,8 @@ def api_token(db):
 
         user = User(
             telegram_user_id=telegram_user_id or next(_tg_id),
-            first_name="API", username="apiuser",
+            first_name="API",
+            username="apiuser",
         )
         db.add(user)
         db.flush()

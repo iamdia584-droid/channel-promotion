@@ -48,8 +48,7 @@ async def _require_staff(event) -> bool:
         staff = _staff_for(db, user.telegram_user_id)
         allowed = staff is not None or user.is_admin or user.is_moderator
     if not allowed:
-        await _edit_or_send(event, "That area is for platform staff.",
-                            menus.back_to("menu"))
+        await _edit_or_send(event, "That area is for platform staff.", menus.back_to("menu"))
     return allowed
 
 
@@ -105,7 +104,7 @@ async def review_queue(event, state: FSMContext) -> None:
                 )
                 rows.append([(f"Review: {c.name[:26]}", f"admin:review:{c.id}")])
             text = "\n".join(lines)
-    keyboard = menus._kb(rows + [[("⬅️ Back", "admin")]]) if rows else menus.back_to("admin")
+    keyboard = menus._kb([*rows, [("⬅️ Back", "admin")]]) if rows else menus.back_to("admin")
     await _edit_or_send(event, text, keyboard)
 
 
@@ -129,18 +128,21 @@ async def review_campaign(callback: CallbackQuery, state: FSMContext) -> None:
             f"(daily {fmt(campaign.daily_budget, campaign.currency)})\n"
             f"CPM bid: {fmt(campaign.bid_cpm, campaign.currency)}\n"
             f"Countries: {', '.join(target.countries) if target and target.countries else 'any'}\n"
-            f"Categories: {', '.join(target.categories) if target and target.categories else 'any'}\n\n"
+            f"Categories: "
+            f"{', '.join(target.categories) if target and target.categories else 'any'}\n\n"
             f"<b>Creative</b>\n{(ad.body_text or '(media only)') if ad else '-'}\n\n"
             f"<b>Link</b>\n<code>{ad.destination_url if ad else '-'}</code>\n\n"
             "Check the text, media, link, landing page, category and targeting."
         )
     await callback.message.edit_text(
         text,
-        reply_markup=menus._kb([
-            [("✅ Approve", f"admin:approve:{campaign_id}")],
-            [("❌ Reject", f"admin:reject:{campaign_id}")],
-            [("⬅️ Back", "admin:queue")],
-        ]),
+        reply_markup=menus._kb(
+            [
+                [("✅ Approve", f"admin:approve:{campaign_id}")],
+                [("❌ Reject", f"admin:reject:{campaign_id}")],
+                [("⬅️ Back", "admin:queue")],
+            ]
+        ),
     )
     await callback.answer()
 
@@ -258,7 +260,9 @@ async def fraud(event, state: FSMContext) -> None:
             for e in rows:
                 lines.append(
                     f"• [{e.band.value}] {e.score} — {e.signal}\n"
-                    f"  {e.subject_type.value} <code>{str(e.subject_id)[:8] if e.subject_id else '-'}</code>"
+                    f"  {e.subject_type.value} "
+                    f"<code>{str(e.subject_id)[:8] if e.subject_id else '-'}</code>"
+                    f" · at risk {fmt(e.amount_at_risk, 'BDT')}"
                     f" · at risk {fmt(e.amount_at_risk, 'BDT')}"
                 )
             lines.append("\n<i>Full evidence is on the web dashboard.</i>")
@@ -292,9 +296,16 @@ async def settings_view(event, state: FSMContext) -> None:
     with bot_session() as db:
         service = SettingsService(db)
         keys = [
-            "platform_commission_rate", "base_cpm", "min_cpm", "max_cpm",
-            "min_withdrawal", "withdrawal_fee_flat", "earnings_validation_hours",
-            "selection_mode", "impression_cap_multiplier", "fraud_block_threshold",
+            "platform_commission_rate",
+            "base_cpm",
+            "min_cpm",
+            "max_cpm",
+            "min_withdrawal",
+            "withdrawal_fee_flat",
+            "earnings_validation_hours",
+            "selection_mode",
+            "impression_cap_multiplier",
+            "fraud_block_threshold",
         ]
         lines = ["<b>⚙️ Key settings</b>\n"]
         for key in keys:

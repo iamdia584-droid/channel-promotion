@@ -68,15 +68,18 @@ class SettlementService:
     def settle_delivery(self, delivery: AdDelivery) -> SettlementResult:
         """Settle every unsettled billable impression on this delivery."""
         if delivery.status in (DeliveryStatus.CANCELLED, DeliveryStatus.FAILED):
-            return SettlementResult(False, None, 0, ZERO, ZERO, ZERO,
-                                    f"delivery is {delivery.status.value}")
+            return SettlementResult(
+                False, None, 0, ZERO, ZERO, ZERO, f"delivery is {delivery.status.value}"
+            )
 
         rows = self.session.scalars(
-            select(Impression).where(
+            select(Impression)
+            .where(
                 Impression.delivery_id == delivery.id,
                 Impression.billable.is_(True),
                 Impression.settlement_batch_id.is_(None),
-            ).order_by(Impression.occurred_at)
+            )
+            .order_by(Impression.occurred_at)
         ).all()
         impressions = sum(r.quantity for r in rows)
         if impressions <= 0:
@@ -96,12 +99,11 @@ class SettlementService:
         if gross > available:
             gross = available
         if gross <= ZERO:
-            return SettlementResult(False, None, 0, ZERO, ZERO, ZERO,
-                                    "no reserved budget left on this delivery")
+            return SettlementResult(
+                False, None, 0, ZERO, ZERO, ZERO, "no reserved budget left on this delivery"
+            )
 
-        publisher_amount, platform_amount = split_commission(
-            gross, delivery.commission_rate
-        )
+        publisher_amount, platform_amount = split_commission(gross, delivery.commission_rate)
         # Deterministic batch id: the same impression set always yields the same
         # batch, so a retry is caught by the ledger's idempotency key.
         batch_id = uuid.uuid5(
@@ -127,8 +129,7 @@ class SettlementService:
             legs=legs,
             idempotency_key=f"settlement:{batch_id}",
             description=(
-                f"Settled {impressions} billable impressions at "
-                f"{delivery.effective_cpm} CPM"
+                f"Settled {impressions} billable impressions at {delivery.effective_cpm} CPM"
             ),
             advertiser_id=campaign.advertiser_id,
             publisher_id=delivery.publisher_id,
@@ -138,7 +139,12 @@ class SettlementService:
         )
         if result.replayed:
             return SettlementResult(
-                False, batch_id, impressions, gross, publisher_amount, platform_amount,
+                False,
+                batch_id,
+                impressions,
+                gross,
+                publisher_amount,
+                platform_amount,
                 "already settled",
             )
 
@@ -160,10 +166,7 @@ class SettlementService:
         # the delivery stays in MEASURING and will settle again.
         delivery.status = (
             DeliveryStatus.SETTLED
-            if (
-                delivery.measurement_ends_at is None
-                or utcnow() >= delivery.measurement_ends_at
-            )
+            if (delivery.measurement_ends_at is None or utcnow() >= delivery.measurement_ends_at)
             else DeliveryStatus.MEASURING
         )
 
@@ -176,8 +179,11 @@ class SettlementService:
         self._update_ad_view_average(channel, delivery, impressions)
 
         self.pacing.commit_spend(
-            campaign, delivery.reserved_amount, gross,
-            impressions=impressions, clicks=delivery.clicks,
+            campaign,
+            delivery.reserved_amount,
+            gross,
+            impressions=impressions,
+            clicks=delivery.clicks,
             at=delivery.sent_at or utcnow(),
         )
 
@@ -206,13 +212,14 @@ class SettlementService:
         # window is still open would leave later impressions unfundable, so the
         # publisher would lose earnings they had genuinely generated.
         window_closed = (
-            delivery.measurement_ends_at is None
-            or utcnow() >= delivery.measurement_ends_at
+            delivery.measurement_ends_at is None or utcnow() >= delivery.measurement_ends_at
         )
         unused = q(D(delivery.reserved_amount) - D(delivery.settled_amount))
         if unused > ZERO and window_closed:
             self.wallets.release_budget(
-                campaign.advertiser_id, campaign.id, unused,
+                campaign.advertiser_id,
+                campaign.id,
+                unused,
                 idempotency_key=f"delivery-unused:{delivery.id}",
                 description="Unused delivery reservation returned",
             )
@@ -233,7 +240,9 @@ class SettlementService:
         campaign = self.session.get(Campaign, delivery.campaign_id)
         if campaign is not None and amount > ZERO:
             self.wallets.release_budget(
-                campaign.advertiser_id, campaign.id, amount,
+                campaign.advertiser_id,
+                campaign.id,
+                amount,
                 idempotency_key=f"delivery-unmeasured:{delivery.id}",
                 description="No measurable impressions; reservation returned",
             )
@@ -257,10 +266,10 @@ class SettlementService:
 
     def _complete_if_exhausted(self, campaign: Campaign) -> None:
         now = utcnow()
-        if q(campaign.remaining_budget) <= ZERO or campaign.ends_at <= now:
-            if campaign.status is CampaignStatus.RUNNING:
-                campaign.status = CampaignStatus.COMPLETED
-                campaign.completed_at = now
+        exhausted = q(campaign.remaining_budget) <= ZERO or campaign.ends_at <= now
+        if exhausted and campaign.status is CampaignStatus.RUNNING:
+            campaign.status = CampaignStatus.COMPLETED
+            campaign.completed_at = now
 
     # ------------------------------------------------------------------
 

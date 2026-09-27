@@ -17,9 +17,9 @@ Three guarantees it enforces, in order:
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Iterable, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -181,9 +181,8 @@ class LedgerService:
                 LedgerAccount.kind == kind,
                 LedgerAccount.currency == currency,
                 LedgerAccount.owner_type == OWNER_FOR_KIND[kind],
-                LedgerAccount.owner_id == (
-                    None if OWNER_FOR_KIND[kind] is AccountOwnerType.PLATFORM else owner_id
-                ),
+                LedgerAccount.owner_id
+                == (None if OWNER_FOR_KIND[kind] is AccountOwnerType.PLATFORM else owner_id),
             )
         ).one_or_none()
         return q(account.balance) if account else ZERO
@@ -192,9 +191,7 @@ class LedgerService:
 
     def find_by_key(self, idempotency_key: str) -> LedgerTransaction | None:
         return self.session.scalars(
-            select(LedgerTransaction).where(
-                LedgerTransaction.idempotency_key == idempotency_key
-            )
+            select(LedgerTransaction).where(LedgerTransaction.idempotency_key == idempotency_key)
         ).one_or_none()
 
     def post(
@@ -264,8 +261,9 @@ class LedgerService:
         self.session.add(txn)
 
         # Resolve every account first, then lock them in a deterministic order.
-        resolved = [(leg, self.get_or_create_account(leg.kind, currency, leg.owner_id))
-                    for leg in legs]
+        resolved = [
+            (leg, self.get_or_create_account(leg.kind, currency, leg.owner_id)) for leg in legs
+        ]
         self._lock_accounts(account for _, account in resolved)
 
         entries: list[LedgerEntry] = []
@@ -365,8 +363,10 @@ class LedgerService:
 
     @staticmethod
     def _assert_balanced(legs: Sequence[Leg]) -> None:
-        debits = q(sum((l.amount for l in legs if l.direction is EntryDirection.DEBIT), ZERO))
-        credits = q(sum((l.amount for l in legs if l.direction is EntryDirection.CREDIT), ZERO))
+        debits = q(sum((leg.amount for leg in legs if leg.direction is EntryDirection.DEBIT), ZERO))
+        credits = q(
+            sum((leg.amount for leg in legs if leg.direction is EntryDirection.CREDIT), ZERO)
+        )
         if debits != credits:
             raise UnbalancedTransaction(
                 f"debits {debits} != credits {credits}",
@@ -422,9 +422,5 @@ class LedgerService:
         ).all()
         total = ZERO
         for entry in entries:
-            total += (
-                D(entry.amount)
-                if entry.direction is account.normal_side
-                else -D(entry.amount)
-            )
+            total += D(entry.amount) if entry.direction is account.normal_side else -D(entry.amount)
         return q(total)

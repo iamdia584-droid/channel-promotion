@@ -51,9 +51,7 @@ def authenticate(db: Session, email: str, password: str, totp_code: str | None) 
     if staff is None or not staff.is_active:
         raise generic
     if staff.locked_until and staff.locked_until > utcnow():
-        raise PermissionDenied(
-            "this account is temporarily locked after repeated failed sign-ins"
-        )
+        raise PermissionDenied("this account is temporarily locked after repeated failed sign-ins")
     if not verify_password(password, staff.password_hash):
         staff.failed_logins += 1
         if staff.failed_logins >= MAX_FAILED:
@@ -111,9 +109,7 @@ def verify_csrf(request: Request, submitted: str | None) -> None:
 
 def require_role(staff: StaffUser, *roles: Role) -> None:
     if roles and staff.role not in roles:
-        raise PermissionDenied(
-            f"this action requires: {', '.join(r.value for r in roles)}"
-        )
+        raise PermissionDenied(f"this action requires: {', '.join(r.value for r in roles)}")
 
 
 def bootstrap_admin(db: Session) -> StaffUser | None:
@@ -128,8 +124,11 @@ def bootstrap_admin(db: Session) -> StaffUser | None:
     if len(password) < 12:
         raise ValidationFailed("BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters")
     staff = StaffUser(
-        email=email, password_hash=hash_password(password),
-        full_name="Bootstrap Admin", role=Role.ADMIN, is_active=True,
+        email=email,
+        password_hash=hash_password(password),
+        full_name="Bootstrap Admin",
+        role=Role.ADMIN,
+        is_active=True,
     )
     db.add(staff)
     db.flush()

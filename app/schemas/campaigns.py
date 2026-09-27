@@ -62,7 +62,7 @@ class CampaignCreate(Schema):
         return D(value)
 
     @model_validator(mode="after")
-    def _schedule(self) -> "CampaignCreate":
+    def _schedule(self) -> CampaignCreate:
         if self.ends_at <= self.starts_at:
             raise ValueError("ends_at must be after starts_at")
         if self.daily_budget > self.total_budget:

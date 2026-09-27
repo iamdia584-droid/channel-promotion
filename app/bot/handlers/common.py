@@ -7,8 +7,8 @@ from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from app.bot.keyboards import menus
 from app.bot import texts
+from app.bot.keyboards import menus
 from app.bot.session import bot_session, resolve_user
 from app.core.money import fmt
 from app.services.analytics import AnalyticsService

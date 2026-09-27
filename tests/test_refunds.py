@@ -38,8 +38,9 @@ def test_spec_section_35_example(db, make_advertiser, make_campaign, funded):
     assert quote.refundable == Decimal("6500.000000")
 
 
-def test_refund_returns_money_to_available_balance(db, make_advertiser, make_campaign,
-                                                   funded, make_staff):
+def test_refund_returns_money_to_available_balance(
+    db, make_advertiser, make_campaign, funded, make_staff
+):
     advertiser = funded(make_advertiser(), "20000")
     campaign = make_campaign(advertiser, total_budget="10000", daily_budget="10000")
     wallets = WalletService(db)
@@ -82,8 +83,11 @@ def test_refund_becomes_available_once_the_delivery_settles(db, sent_delivery, m
 
     delivery, campaign, channel, advertiser = sent_delivery(avg_views=20_000, bid_cpm="100")
     ImpressionService(db).record(
-        delivery, kind=ImpressionKind.MEASURED, source=ImpressionSource.TRACKING_LINK,
-        dedupe_key="x1", quantity=1_000,
+        delivery,
+        kind=ImpressionKind.MEASURED,
+        source=ImpressionSource.TRACKING_LINK,
+        dedupe_key="x1",
+        quantity=1_000,
     )
     delivery.measurement_ends_at = utcnow()
     db.flush()
@@ -163,8 +167,7 @@ def test_refund_approval_is_idempotent(db, make_advertiser, make_campaign, funde
     assert q(wallets.for_advertiser(advertiser.id).available_balance) == before + q("4000")
 
 
-def test_duplicate_refund_request_returns_the_same_row(db, make_advertiser, make_campaign,
-                                                       funded):
+def test_duplicate_refund_request_returns_the_same_row(db, make_advertiser, make_campaign, funded):
     advertiser = funded(make_advertiser(), "20000")
     campaign = make_campaign(advertiser, total_budget="4000", daily_budget="4000")
     WalletService(db).reserve_budget(advertiser.id, campaign.id, "4000", idempotency_key="r5")
@@ -205,8 +208,9 @@ def test_rejection_requires_a_note(db, make_advertiser, make_campaign, funded, m
         RefundService(db).reject(refund, Actor.staff(make_staff()), "  ")
 
 
-def test_refund_is_audited_with_its_ledger_transaction(db, make_advertiser, make_campaign,
-                                                       funded, make_staff):
+def test_refund_is_audited_with_its_ledger_transaction(
+    db, make_advertiser, make_campaign, funded, make_staff
+):
     advertiser = funded(make_advertiser(), "20000")
     campaign = make_campaign(advertiser, total_budget="4000", daily_budget="4000")
     WalletService(db).reserve_budget(advertiser.id, campaign.id, "4000", idempotency_key="r8")

@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -26,7 +25,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, GUID, Money, StrEnumType, TelegramId, Timestamped, UTCDateTime, UUIDPk
+from app.db.base import GUID, Base, Money, StrEnumType, TelegramId, Timestamped, UTCDateTime, UUIDPk
 from app.models.enums import (
     DeliveryStatus,
     ImpressionKind,
@@ -78,7 +77,9 @@ class AdDelivery(UUIDPk, Timestamped, Base):
     commission_rate: Mapped[object] = mapped_column(Numeric(6, 4), nullable=False)
     price_breakdown: Mapped[dict] = mapped_column(default=dict, nullable=False)
 
-    selection_mode: Mapped[SelectionMode] = mapped_column(StrEnumType(SelectionMode, 16), nullable=False)
+    selection_mode: Mapped[SelectionMode] = mapped_column(
+        StrEnumType(SelectionMode, 16), nullable=False
+    )
     selection_score: Mapped[object] = mapped_column(Numeric(12, 6), default="0", nullable=False)
     selection_debug: Mapped[dict] = mapped_column(default=dict, nullable=False)
 
@@ -100,17 +101,15 @@ class AdDelivery(UUIDPk, Timestamped, Base):
 
     tracking_nonce: Mapped[str] = mapped_column(String(64), nullable=False)
     sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), index=True)
-    measurement_ends_at: Mapped[datetime | None] = mapped_column(
-        UTCDateTime(), index=True
-    )
+    measurement_ends_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), index=True)
     settled_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     removed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     failure_reason: Mapped[str | None] = mapped_column(String(500))
     fraud_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    campaign: Mapped["Campaign"] = relationship()
-    advertisement: Mapped["Advertisement"] = relationship()
-    channel: Mapped["PublisherChannel"] = relationship()
+    campaign: Mapped[Campaign] = relationship()
+    advertisement: Mapped[Advertisement] = relationship()
+    channel: Mapped[PublisherChannel] = relationship()
 
     __table_args__ = (
         UniqueConstraint("tracking_nonce", name="uq_ad_deliveries_tracking_nonce"),
@@ -156,12 +155,19 @@ class Impression(UUIDPk, Base):
     telegram_user_id: Mapped[int | None] = mapped_column(TelegramId, index=True)
     session_hash: Mapped[str | None] = mapped_column(String(64), index=True)
 
-    kind: Mapped[ImpressionKind] = mapped_column(StrEnumType(ImpressionKind, 24), nullable=False, index=True)
-    source: Mapped[ImpressionSource] = mapped_column(StrEnumType(ImpressionSource, 24), nullable=False)
+    kind: Mapped[ImpressionKind] = mapped_column(
+        StrEnumType(ImpressionKind, 24), nullable=False, index=True
+    )
+    source: Mapped[ImpressionSource] = mapped_column(
+        StrEnumType(ImpressionSource, 24), nullable=False
+    )
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
     validation_status: Mapped[ValidationStatus] = mapped_column(
-        StrEnumType(ValidationStatus, 16), default=ValidationStatus.PENDING, nullable=False, index=True
+        StrEnumType(ValidationStatus, 16),
+        default=ValidationStatus.PENDING,
+        nullable=False,
+        index=True,
     )
     billable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     fraud_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -173,9 +179,7 @@ class Impression(UUIDPk, Base):
     # The structural defence against double counting (spec §8, §26). Uniqueness is
     # enforced by the database, not by an application check that a race can lose.
     dedupe_key: Mapped[str] = mapped_column(String(128), nullable=False)
-    occurred_at: Mapped[datetime] = mapped_column(
-        UTCDateTime(), nullable=False, index=True
-    )
+    occurred_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, index=True)
     recorded_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
     ip_hash: Mapped[str | None] = mapped_column(String(64), index=True)
     user_agent_hash: Mapped[str | None] = mapped_column(String(64))
@@ -222,9 +226,7 @@ class Click(UUIDPk, Base):
     ip_hash: Mapped[str | None] = mapped_column(String(64), index=True)
     user_agent_hash: Mapped[str | None] = mapped_column(String(64))
     referrer: Mapped[str | None] = mapped_column(Text)
-    occurred_at: Mapped[datetime] = mapped_column(
-        UTCDateTime(), nullable=False, index=True
-    )
+    occurred_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, index=True)
     meta: Mapped[dict] = mapped_column(default=dict, nullable=False)
 
     __table_args__ = (UniqueConstraint("dedupe_key", name="uq_clicks_dedupe_key"),)

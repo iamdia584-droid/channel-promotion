@@ -82,8 +82,9 @@ def test_distinct_users_each_bill(db, sent_delivery):
 def test_impression_before_the_post_does_not_bill(db, sent_delivery):
     delivery, *_ = sent_delivery()
     service = ImpressionService(db)
-    result = _record(service, delivery, "early",
-                     occurred_at=delivery.sent_at - timedelta(minutes=1))
+    result = _record(
+        service, delivery, "early", occurred_at=delivery.sent_at - timedelta(minutes=1)
+    )
     assert result.status is ValidationStatus.OUT_OF_WINDOW
     assert result.billable is False
     assert delivery.billable_impressions == 0
@@ -112,16 +113,12 @@ def test_delivery_cannot_bill_beyond_demonstrated_reach(db, sent_delivery):
     assert delivery.impression_cap <= 1_500
 
     service = ImpressionService(db)
-    accepted = sum(
-        1 for i in range(3_000) if _record(service, delivery, f"cap:{i}").billable
-    )
+    accepted = sum(1 for i in range(3_000) if _record(service, delivery, f"cap:{i}").billable)
     assert accepted == delivery.impression_cap
     assert delivery.billable_impressions == delivery.impression_cap
     # The excess is recorded as capped evidence, not silently dropped.
     capped = (
-        db.query(Impression)
-        .filter(Impression.validation_status == ValidationStatus.CAPPED)
-        .count()
+        db.query(Impression).filter(Impression.validation_status == ValidationStatus.CAPPED).count()
     )
     assert capped > 0
 
@@ -145,8 +142,13 @@ def test_high_fraud_score_blocks_billing_but_keeps_evidence(db, sent_delivery):
     service = ImpressionService(db)
 
     clean = _record(service, delivery, "clean", fraud_score=10)
-    dirty = _record(service, delivery, "dirty", fraud_score=95,
-                    fraud_reasons=["datacenter_ip", "impossible_velocity"])
+    dirty = _record(
+        service,
+        delivery,
+        "dirty",
+        fraud_score=95,
+        fraud_reasons=["datacenter_ip", "impossible_velocity"],
+    )
 
     assert clean.billable is True
     assert dirty.billable is False
@@ -179,15 +181,25 @@ def test_view_counter_impressions_need_the_right_measurement_mode(db, sent_deliv
     assert channel.measurement_mode is MeasurementMode.CLICK_ONLY
     service = ImpressionService(db)
 
-    blocked = _record(service, delivery, "v1", kind=ImpressionKind.TELEGRAM_REPORTED,
-                      source=ImpressionSource.VIEW_COUNTER)
+    blocked = _record(
+        service,
+        delivery,
+        "v1",
+        kind=ImpressionKind.TELEGRAM_REPORTED,
+        source=ImpressionSource.VIEW_COUNTER,
+    )
     assert blocked.billable is False
     assert blocked.status is ValidationStatus.INVALIDATED
 
     channel.measurement_mode = MeasurementMode.VIEW_COUNTER
     db.flush()
-    allowed = _record(service, delivery, "v2", kind=ImpressionKind.TELEGRAM_REPORTED,
-                      source=ImpressionSource.VIEW_COUNTER)
+    allowed = _record(
+        service,
+        delivery,
+        "v2",
+        kind=ImpressionKind.TELEGRAM_REPORTED,
+        source=ImpressionSource.VIEW_COUNTER,
+    )
     assert allowed.billable is True
 
 
@@ -258,8 +270,9 @@ def test_duplicate_clicks_are_suppressed(db, sent_delivery):
 def test_fraudulent_click_is_recorded_but_not_counted(db, sent_delivery):
     delivery, *_ = sent_delivery()
     service = ImpressionService(db)
-    click = service.record_click(delivery, dedupe_key="c:bad", fraud_score=99,
-                                 fraud_reasons=["self_click"])
+    click = service.record_click(
+        delivery, dedupe_key="c:bad", fraud_score=99, fraud_reasons=["self_click"]
+    )
     assert click is not None
     assert click.valid is False
     assert delivery.clicks == 0

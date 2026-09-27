@@ -43,9 +43,12 @@ def _channel_out(channel) -> ChannelOut:
 
     score = D(channel.quality_score or 0)
     band = (
-        "poor" if score < Decimal("0.25")
-        else "fair" if score < Decimal("0.50")
-        else "good" if score < Decimal("0.75")
+        "poor"
+        if score < Decimal("0.25")
+        else "fair"
+        if score < Decimal("0.50")
+        else "good"
+        if score < Decimal("0.75")
         else "excellent"
     )
     return ChannelOut(
@@ -84,15 +87,22 @@ def _owned_channel(db, publisher, channel_id: uuid.UUID):
 # --- channels -------------------------------------------------------------
 
 
-@router.post("/me/channels", response_model=ChannelOut, status_code=201,
-             dependencies=[throttle("channel_register", limit=20, window=3600)])
+@router.post(
+    "/me/channels",
+    response_model=ChannelOut,
+    status_code=201,
+    dependencies=[throttle("channel_register", limit=20, window=3600)],
+)
 def register_channel(
     db: DbSession, publisher: CurrentPublisher, body: ChannelRegisterIn
 ) -> ChannelOut:
     """Register a chat. Ownership is proven against Telegram, not assumed (spec §4)."""
     result = ChannelService(db).register(
-        publisher, body.identifier, category=body.category,
-        language=body.language, country=body.country,
+        publisher,
+        body.identifier,
+        category=body.category,
+        language=body.language,
+        country=body.country,
     )
     if not result.ok:
         raise ValidationFailed(result.user_message(), verification_status=result.status.value)
@@ -105,15 +115,15 @@ def list_channels(db: DbSession, publisher: CurrentPublisher) -> list[ChannelOut
 
 
 @router.get("/me/channels/{channel_id}", response_model=ChannelOut)
-def get_channel(
-    db: DbSession, publisher: CurrentPublisher, channel_id: uuid.UUID
-) -> ChannelOut:
+def get_channel(db: DbSession, publisher: CurrentPublisher, channel_id: uuid.UUID) -> ChannelOut:
     return _channel_out(_owned_channel(db, publisher, channel_id))
 
 
 @router.patch("/me/channels/{channel_id}", response_model=ChannelOut)
 def update_channel(
-    db: DbSession, publisher: CurrentPublisher, channel_id: uuid.UUID,
+    db: DbSession,
+    publisher: CurrentPublisher,
+    channel_id: uuid.UUID,
     body: ChannelSettingsIn,
 ) -> ChannelOut:
     channel = _owned_channel(db, publisher, channel_id)
@@ -145,11 +155,7 @@ def revalidate_channel(
 def channel_performance(db: DbSession, publisher: CurrentPublisher) -> dict:
     from app.api.v1.advertisers import _stringify
 
-    return {
-        "rows": [
-            _stringify(r) for r in AnalyticsService(db).channel_performance(publisher.id)
-        ]
-    }
+    return {"rows": [_stringify(r) for r in AnalyticsService(db).channel_performance(publisher.id)]}
 
 
 # --- earnings -------------------------------------------------------------
@@ -168,25 +174,26 @@ def earnings_summary(db: DbSession, publisher: CurrentPublisher) -> EarningsSumm
 
 @router.get("/me/earnings", response_model=Page[EarningOut])
 def list_earnings(
-    db: DbSession, publisher: CurrentPublisher,
-    limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0),
+    db: DbSession,
+    publisher: CurrentPublisher,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ) -> Page[EarningOut]:
     rows = EarningsService(db).list_for_publisher(publisher.id, limit, offset)
     return Page[EarningOut](
         items=[EarningOut.model_validate(r) for r in rows],
-        total=len(rows) + offset, limit=limit, offset=offset,
+        total=len(rows) + offset,
+        limit=limit,
+        offset=offset,
     )
 
 
 @router.get("/me/daily")
-def daily(
-    db: DbSession, publisher: CurrentPublisher, days: int = Query(30, ge=1, le=365)
-) -> dict:
+def daily(db: DbSession, publisher: CurrentPublisher, days: int = Query(30, ge=1, le=365)) -> dict:
     from app.api.v1.advertisers import _stringify
 
     return {
-        "rows": [_stringify(r)
-                 for r in AnalyticsService(db).publisher_daily(publisher.id, days)]
+        "rows": [_stringify(r) for r in AnalyticsService(db).publisher_daily(publisher.id, days)]
     }
 
 
@@ -203,7 +210,8 @@ def report_csv(
 ) -> Response:
     csv_text = AnalyticsService(db).publisher_report_csv(publisher.id, days)
     return Response(
-        content=csv_text, media_type="text/csv",
+        content=csv_text,
+        media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=publisher-report.csv"},
     )
 
@@ -216,17 +224,20 @@ def add_payout_method(
     db: DbSession, publisher: CurrentPublisher, body: PayoutMethodIn
 ) -> PayoutMethodOut:
     record = WithdrawalService(db).add_payout_method(
-        publisher.id, body.method, body.destination,
-        account_name=body.account_name, bank_name=body.bank_name,
-        branch=body.branch, label=body.label, make_default=body.make_default,
+        publisher.id,
+        body.method,
+        body.destination,
+        account_name=body.account_name,
+        bank_name=body.bank_name,
+        branch=body.branch,
+        label=body.label,
+        make_default=body.make_default,
     )
     return PayoutMethodOut.model_validate(record)
 
 
 @router.get("/me/payout-methods", response_model=list[PayoutMethodOut])
-def list_payout_methods(
-    db: DbSession, publisher: CurrentPublisher
-) -> list[PayoutMethodOut]:
+def list_payout_methods(db: DbSession, publisher: CurrentPublisher) -> list[PayoutMethodOut]:
     return [
         PayoutMethodOut.model_validate(m)
         for m in WithdrawalService(db).list_payout_methods(publisher.id)
@@ -255,20 +266,33 @@ def withdrawal_quote(
     service = WithdrawalService(db)
     breakdown = service.quote_fee(amount)
     return FeeQuoteOut(
-        amount=breakdown.amount, fee=breakdown.fee, net=breakdown.net,
-        minimum=SettingsService(db).money("min_withdrawal"), currency=publisher.currency,
+        amount=breakdown.amount,
+        fee=breakdown.fee,
+        net=breakdown.net,
+        minimum=SettingsService(db).money("min_withdrawal"),
+        currency=publisher.currency,
     )
 
 
-@router.post("/me/withdrawals", response_model=WithdrawalOut, status_code=201,
-             dependencies=[throttle("withdrawal", limit=10, window=3600)])
+@router.post(
+    "/me/withdrawals",
+    response_model=WithdrawalOut,
+    status_code=201,
+    dependencies=[throttle("withdrawal", limit=10, window=3600)],
+)
 def request_withdrawal(
-    db: DbSession, publisher: CurrentPublisher, principal: CurrentPrincipal,
-    body: WithdrawalIn, idempotency_key: IdempotencyKey = None,
+    db: DbSession,
+    publisher: CurrentPublisher,
+    principal: CurrentPrincipal,
+    body: WithdrawalIn,
+    idempotency_key: IdempotencyKey = None,
 ) -> WithdrawalOut:
     withdrawal = WithdrawalService(db).request(
-        publisher.id, body.amount, body.payout_method_id,
-        idempotency_key=idempotency_key, actor=principal.actor,
+        publisher.id,
+        body.amount,
+        body.payout_method_id,
+        idempotency_key=idempotency_key,
+        actor=principal.actor,
     )
     return WithdrawalOut.model_validate(withdrawal)
 
@@ -283,7 +307,9 @@ def list_withdrawals(db: DbSession, publisher: CurrentPublisher) -> list[Withdra
 
 @router.post("/me/withdrawals/{withdrawal_id}/cancel", response_model=WithdrawalOut)
 def cancel_withdrawal(
-    db: DbSession, publisher: CurrentPublisher, principal: CurrentPrincipal,
+    db: DbSession,
+    publisher: CurrentPublisher,
+    principal: CurrentPrincipal,
     withdrawal_id: uuid.UUID,
 ) -> WithdrawalOut:
     from app.models.money import Withdrawal
@@ -291,6 +317,4 @@ def cancel_withdrawal(
     withdrawal = db.get(Withdrawal, withdrawal_id)
     if withdrawal is None or withdrawal.publisher_id != publisher.id:
         raise NotFound("withdrawal not found")
-    return WithdrawalOut.model_validate(
-        WithdrawalService(db).cancel(withdrawal, principal.actor)
-    )
+    return WithdrawalOut.model_validate(WithdrawalService(db).cancel(withdrawal, principal.actor))

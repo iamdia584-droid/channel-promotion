@@ -10,7 +10,6 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -20,7 +19,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, GUID, Money, StrEnumType, Timestamped, UTCDateTime, UUIDPk
+from app.db.base import GUID, Base, Money, StrEnumType, Timestamped, UTCDateTime, UUIDPk
 from app.models.enums import (
     AdStatus,
     CampaignStatus,
@@ -39,7 +38,9 @@ class Campaign(UUIDPk, Timestamped, Base):
         GUID, ForeignKey("advertisers.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    campaign_type: Mapped[CampaignType] = mapped_column(StrEnumType(CampaignType, 24), nullable=False)
+    campaign_type: Mapped[CampaignType] = mapped_column(
+        StrEnumType(CampaignType, 24), nullable=False
+    )
     pricing_model: Mapped[PricingModel] = mapped_column(
         StrEnumType(PricingModel, 8), default=PricingModel.CPM, nullable=False
     )
@@ -72,19 +73,17 @@ class Campaign(UUIDPk, Timestamped, Base):
     max_impressions_per_user: Mapped[int | None] = mapped_column(Integer)
     max_impressions_per_channel_per_day: Mapped[int | None] = mapped_column(Integer)
 
-    allow_specific_channels: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False
-    )
+    allow_specific_channels: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     paused_reason: Mapped[str | None] = mapped_column(String(300))
     approved_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     meta: Mapped[dict] = mapped_column(default=dict, nullable=False)
 
-    advertiser: Mapped["Advertiser"] = relationship()
-    ads: Mapped[list["Advertisement"]] = relationship(
+    advertiser: Mapped[Advertiser] = relationship()
+    ads: Mapped[list[Advertisement]] = relationship(
         back_populates="campaign", cascade="all, delete-orphan"
     )
-    target: Mapped["CampaignTarget | None"] = relationship(
+    target: Mapped[CampaignTarget | None] = relationship(
         back_populates="campaign", uselist=False, cascade="all, delete-orphan"
     )
 

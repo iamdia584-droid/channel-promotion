@@ -9,8 +9,8 @@ sending a half-rendered message.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -43,7 +43,9 @@ TEMPLATES: dict[str, Renderer] = {
         f"Reason: {p.get('reason', 'not specified')}\n\n"
         "You can edit it and submit it again."
     ),
-    "campaign_started": lambda p: f"🚀 Campaign <b>{p['campaign_name']}</b> has started delivering.",
+    "campaign_started": lambda p: (
+        f"🚀 Campaign <b>{p['campaign_name']}</b> has started delivering."
+    ),
     "campaign_paused": lambda p: (
         f"⏸ Campaign <b>{p['campaign_name']}</b> is paused.\n"
         f"Reason: {p.get('reason', 'not specified')}"
@@ -58,13 +60,11 @@ TEMPLATES: dict[str, Renderer] = {
         "Top up to keep your campaigns delivering."
     ),
     "deposit_confirmed": lambda p: (
-        f"💰 Deposit received: {_money(p, 'amount')}.\n"
-        f"Available balance: {_money(p, 'available')}"
+        f"💰 Deposit received: {_money(p, 'amount')}.\nAvailable balance: {_money(p, 'available')}"
     ),
     "refund_processed": lambda p: (
         f"↩️ Refund of {_money(p, 'amount')} has been returned to your wallet."
     ),
-
     # --- publisher ---
     "channel_approved": lambda p: (
         f"✅ <b>{p['channel_title']}</b> is verified and can now receive ads."
@@ -101,7 +101,6 @@ TEMPLATES: dict[str, Renderer] = {
         f"❌ Your withdrawal of {_money(p, 'amount')} was rejected and the full "
         f"amount returned to your balance.\nReason: {p.get('reason', 'not specified')}"
     ),
-
     # --- admin ---
     "admin_large_withdrawal": lambda p: (
         f"🔔 Large withdrawal: {_money(p, 'amount')} by publisher {p.get('publisher_id')}.\n"
@@ -157,9 +156,7 @@ class NotificationService:
         if recipient.telegram_user_id is None and recipient.user_id is not None:
             user = self.session.get(User, recipient.user_id)
             if user is not None:
-                recipient = Recipient(
-                    user_id=user.id, telegram_user_id=user.telegram_user_id
-                )
+                recipient = Recipient(user_id=user.id, telegram_user_id=user.telegram_user_id)
 
         row = Notification(
             user_id=recipient.user_id,

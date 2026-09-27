@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import BigInteger, DateTime, MetaData, Numeric, String, func
@@ -57,15 +56,15 @@ class UTCDateTime(TypeDecorator):
             return None
         if value.tzinfo is None:
             # A naive value is assumed UTC: this system never works in local time.
-            return value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
 
     def process_result_value(self, value, dialect):
         if value is None:
             return None
         if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
 
 
 class StrEnumType(TypeDecorator):
@@ -143,7 +142,7 @@ class MoneyType(TypeDecorator):
     impl = Numeric
     cache_ok = True
     #: Micro-units: 10 ** SCALE.
-    MICRO = 10 ** SCALE
+    MICRO = 10**SCALE
 
     def __init__(self) -> None:
         super().__init__(precision=24, scale=SCALE, asdecimal=True)
@@ -175,7 +174,7 @@ TelegramId = BigInteger  # spec §24: Telegram IDs are BIGINT, they exceed int32
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def new_uuid() -> uuid.UUID:

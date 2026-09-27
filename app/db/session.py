@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
+
 
 def build_engine(url: str | None = None) -> Engine:
     """Create an engine, passing only options the chosen pool actually accepts.
@@ -33,22 +34,25 @@ def build_engine(url: str | None = None) -> Engine:
     elif url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
 
-    return create_engine(url, connect_args=connect_args, **kwargs)
+    built = create_engine(url, connect_args=connect_args, **kwargs)
+
+    if built.dialect.name == "sqlite":
+        # SQLite ignores foreign keys unless asked per connection. Registered on
+        # *this* engine rather than on the Engine class: a class-level listener
+        # fires for every engine in the process, so it would send PRAGMA to a
+        # PostgreSQL connection and fail there.
+        @event.listens_for(built, "connect")
+        def _sqlite_pragmas(dbapi_conn, _record):
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
+    return built
 
 
 engine: Engine = build_engine()
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)
-
-
-@event.listens_for(Engine, "connect")
-def _sqlite_pragmas(dbapi_conn, _record):
-    """SQLite ignores foreign keys unless asked. Tests must enforce them too."""
-    if engine.dialect.name != "sqlite":
-        return
-    cur = dbapi_conn.cursor()
-    cur.execute("PRAGMA foreign_keys=ON")
-    cur.close()
 
 
 @contextmanager

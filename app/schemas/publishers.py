@@ -13,8 +13,12 @@ from app.schemas.common import Money, Schema
 
 
 class ChannelRegisterIn(Schema):
-    identifier: str = Field(..., min_length=2, max_length=300,
-                            description="@username, a t.me link, or a numeric chat id")
+    identifier: str = Field(
+        ...,
+        min_length=2,
+        max_length=300,
+        description="@username, a t.me link, or a numeric chat id",
+    )
     category: str | None = Field(None, max_length=48)
     language: str | None = Field(None, max_length=8)
     country: str | None = Field(None, min_length=2, max_length=2)

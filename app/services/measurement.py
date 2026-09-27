@@ -104,9 +104,7 @@ class StaticViewSource:
         for message_id in message_ids:
             views = self.counts.get((telegram_chat_id, message_id))
             if views is not None:
-                out.append(
-                    ViewObservation(telegram_chat_id, message_id, int(views), self.name)
-                )
+                out.append(ViewObservation(telegram_chat_id, message_id, int(views), self.name))
         return out
 
 

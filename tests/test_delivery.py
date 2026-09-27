@@ -81,8 +81,15 @@ def test_click_button_routes_through_our_tracking_redirect(
     ],
 )
 def test_targeting_mismatches_block_delivery(
-    db, delivery_engine, gateway_fixture, make_campaign, make_channel,
-    make_advertiser, funded, kwargs, expected,
+    db,
+    delivery_engine,
+    gateway_fixture,
+    make_campaign,
+    make_channel,
+    make_advertiser,
+    funded,
+    kwargs,
+    expected,
 ):
     advertiser = funded(make_advertiser())
     make_campaign(advertiser, **kwargs)
@@ -144,8 +151,10 @@ def test_unfunded_advertiser_cannot_deliver(
     assert "insufficient available balance" in str(result.debug["rejections"])
 
 
-@pytest.mark.parametrize("status", [ChannelStatus.PENDING, ChannelStatus.SUSPENDED,
-                                    ChannelStatus.REJECTED, ChannelStatus.PAUSED])
+@pytest.mark.parametrize(
+    "status",
+    [ChannelStatus.PENDING, ChannelStatus.SUSPENDED, ChannelStatus.REJECTED, ChannelStatus.PAUSED],
+)
 def test_non_serving_channel_statuses_are_skipped(
     db, delivery_engine, make_campaign, make_channel, make_advertiser, funded, status
 ):
@@ -242,7 +251,7 @@ def test_daily_ad_cap_stops_a_channel_becoming_a_spam_feed(
     db, delivery_engine, gateway_fixture, make_campaign, make_channel, make_advertiser, funded
 ):
     s = SettingsService(db)
-    s.set("max_advertiser_inventory_share", "1.0000")   # isolate the daily cap
+    s.set("max_advertiser_inventory_share", "1.0000")  # isolate the daily cap
     s.set("hour_weights", "[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]")
     advertiser = funded(make_advertiser(), "500000")
     make_campaign(advertiser, total_budget="400000", daily_budget="400000")
@@ -293,7 +302,7 @@ def test_selection_is_not_random_highest_value_wins(
     db, delivery_engine, gateway_fixture, make_channel, make_campaign, make_advertiser, funded
 ):
     SettingsService(db).set("selection_mode", SelectionMode.FIXED_CPM.value)
-    low = make_campaign(funded(make_advertiser()), bid_cpm="20", name="Low bid")
+    make_campaign(funded(make_advertiser()), bid_cpm="20", name="Low bid")
     high = make_campaign(funded(make_advertiser()), bid_cpm="200", name="High bid")
     channel = make_channel()
     gateway_fixture.register_chat(channel.telegram_chat_id)
@@ -382,8 +391,8 @@ def test_weighted_mode_favours_higher_scores_without_starving_others(db, deliver
     ]
     picks = Counter(id(delivery_engine._select(pool, seed=n)) for n in range(400))
     top, bottom = picks[id(pool[0])], picks[id(pool[1])]
-    assert top > bottom          # value wins on average
-    assert bottom > 0            # but the lower bidder is not starved entirely
+    assert top > bottom  # value wins on average
+    assert bottom > 0  # but the lower bidder is not starved entirely
 
 
 def test_selection_debug_explains_the_decision(
@@ -397,6 +406,7 @@ def test_selection_debug_explains_the_decision(
     for key in ("effective_cpm", "relevance", "quality", "pacing_factor", "fatigue"):
         assert key in factors
     import json
+
     json.dumps(delivery.selection_debug)
 
 
@@ -409,7 +419,7 @@ def test_reservation_is_taken_before_the_post_is_sent(
     db, delivery_engine, gateway_fixture, make_channel, make_campaign, make_advertiser, funded
 ):
     advertiser = funded(make_advertiser(), "100000")
-    campaign = make_campaign(advertiser)
+    make_campaign(advertiser)
     channel = make_channel()
     gateway_fixture.register_chat(channel.telegram_chat_id)
 
@@ -458,8 +468,7 @@ def test_expired_campaign_does_not_serve(
 ):
     advertiser = funded(make_advertiser())
     now = utcnow()
-    make_campaign(advertiser, starts_at=now - timedelta(days=10),
-                  ends_at=now - timedelta(days=1))
+    make_campaign(advertiser, starts_at=now - timedelta(days=10), ends_at=now - timedelta(days=1))
     assert delivery_engine.plan(make_channel()).delivery is None
 
 
@@ -468,14 +477,21 @@ def test_future_campaign_does_not_serve(
 ):
     advertiser = funded(make_advertiser())
     now = utcnow()
-    make_campaign(advertiser, starts_at=now + timedelta(days=1),
-                  ends_at=now + timedelta(days=10))
+    make_campaign(advertiser, starts_at=now + timedelta(days=1), ends_at=now + timedelta(days=10))
     assert delivery_engine.plan(make_channel()).delivery is None
 
 
-@pytest.mark.parametrize("status", [CampaignStatus.PAUSED, CampaignStatus.DRAFT,
-                                    CampaignStatus.SUBMITTED, CampaignStatus.REJECTED,
-                                    CampaignStatus.COMPLETED, CampaignStatus.SUSPENDED])
+@pytest.mark.parametrize(
+    "status",
+    [
+        CampaignStatus.PAUSED,
+        CampaignStatus.DRAFT,
+        CampaignStatus.SUBMITTED,
+        CampaignStatus.REJECTED,
+        CampaignStatus.COMPLETED,
+        CampaignStatus.SUSPENDED,
+    ],
+)
 def test_only_running_campaigns_serve(
     db, delivery_engine, make_channel, make_campaign, make_advertiser, funded, status
 ):

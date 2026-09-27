@@ -30,15 +30,15 @@ class Actor:
     request_id: str | None = None
 
     @classmethod
-    def system(cls, label: str = "scheduler") -> "Actor":
+    def system(cls, label: str = "scheduler") -> Actor:
         return cls("system", None, label)
 
     @classmethod
-    def staff(cls, staff, ip=None, user_agent=None, request_id=None) -> "Actor":
+    def staff(cls, staff, ip=None, user_agent=None, request_id=None) -> Actor:
         return cls("staff", str(staff.id), staff.email, ip, user_agent, request_id)
 
     @classmethod
-    def user(cls, user) -> "Actor":
+    def user(cls, user) -> Actor:
         return cls("user", str(user.id), user.display_name)
 
 
@@ -94,9 +94,15 @@ class AuditService:
     ) -> AuditLog:
         """A financial action must always name the ledger transaction it caused."""
         return self.log(
-            actor, action, target_type=target_type, target_id=target_id,
-            old_value=old_value, new_value=new_value, reason=reason,
-            is_financial=True, ledger_transaction_id=ledger_transaction_id,
+            actor,
+            action,
+            target_type=target_type,
+            target_id=target_id,
+            old_value=old_value,
+            new_value=new_value,
+            reason=reason,
+            is_financial=True,
+            ledger_transaction_id=ledger_transaction_id,
         )
 
     def recent(

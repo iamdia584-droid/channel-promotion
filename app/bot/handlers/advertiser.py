@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -82,8 +82,7 @@ async def start_wizard(event, state: FSMContext) -> None:
     with bot_session() as db:
         user = resolve_user(db, event.from_user)
         if not user.is_advertiser:
-            await _edit_or_send(event, texts.not_registered("an advertiser"),
-                                menus.back_to("menu"))
+            await _edit_or_send(event, texts.not_registered("an advertiser"), menus.back_to("menu"))
             return
         wallets = WalletService(db)
         view = wallets.view(wallets.for_advertiser(user.advertiser.id))
@@ -191,9 +190,7 @@ async def wizard_destination(message: Message, state: FSMContext) -> None:
 @router.message(NewCampaign.cta)
 async def wizard_cta(message: Message, state: FSMContext) -> None:
     raw = (message.text or "").strip()
-    await state.update_data(
-        cta_text=None if raw.lower() in {"skip", "-"} else raw[:64]
-    )
+    await state.update_data(cta_text=None if raw.lower() in {"skip", "-"} else raw[:64])
     await _ask_total_budget(message, state)
 
 
@@ -264,9 +261,7 @@ async def wizard_daily_budget(message: Message, state: FSMContext) -> None:
         return
     await state.update_data(daily_budget=str(daily))
     await state.set_state(NewCampaign.pricing_model)
-    await message.answer(
-        "<b>Step 4 of 7 — pricing model</b>", reply_markup=menus.pricing_models()
-    )
+    await message.answer("<b>Step 4 of 7 — pricing model</b>", reply_markup=menus.pricing_models())
 
 
 @router.callback_query(NewCampaign.pricing_model, F.data.startswith("pmodel:"))
@@ -300,9 +295,7 @@ async def wizard_bid(message: Message, state: FSMContext) -> None:
         settings = SettingsService(db)
         low, high = settings.money("min_cpm"), settings.money("max_cpm")
     if not (low <= bid <= high):
-        await message.answer(
-            f"The bid must be between {fmt(low, 'BDT')} and {fmt(high, 'BDT')}."
-        )
+        await message.answer(f"The bid must be between {fmt(low, 'BDT')} and {fmt(high, 'BDT')}.")
         return
     await state.update_data(bid_cpm=str(bid))
     await state.set_state(NewCampaign.countries)
@@ -321,8 +314,7 @@ async def wizard_countries(message: Message, state: FSMContext) -> None:
     for code in codes:
         if len(code) != 2 or not code.isalpha():
             await message.answer(
-                f"<code>{code}</code> is not a 2-letter country code. "
-                "Example: <code>BD</code>."
+                f"<code>{code}</code> is not a 2-letter country code. Example: <code>BD</code>."
             )
             return
     await state.update_data(countries=codes)
@@ -337,9 +329,7 @@ async def wizard_countries(message: Message, state: FSMContext) -> None:
 
 @router.message(NewCampaign.categories)
 async def wizard_categories(message: Message, state: FSMContext) -> None:
-    await state.update_data(
-        categories=[c.lower() for c in _parse_list(message.text or "")]
-    )
+    await state.update_data(categories=[c.lower() for c in _parse_list(message.text or "")])
     await state.set_state(NewCampaign.duration)
     await message.answer(
         "<b>Step 6 of 7 — schedule</b>\n\n"
@@ -399,8 +389,7 @@ async def wizard_confirm(callback: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     campaign_id = data.get("campaign_id")
     if not campaign_id:
-        await callback.answer("This draft expired. Start again with /campaign.",
-                              show_alert=True)
+        await callback.answer("This draft expired. Start again with /campaign.", show_alert=True)
         await state.clear()
         return
     try:
@@ -456,8 +445,7 @@ async def list_campaigns(event, state: FSMContext) -> None:
     with bot_session() as db:
         user = resolve_user(db, event.from_user)
         if not user.is_advertiser or not user.advertiser:
-            await _edit_or_send(event, texts.not_registered("an advertiser"),
-                                menus.back_to("menu"))
+            await _edit_or_send(event, texts.not_registered("an advertiser"), menus.back_to("menu"))
             return
         campaigns = CampaignService(db).list_for_advertiser(user.advertiser.id, limit=15)
         currency = user.advertiser.currency
@@ -474,11 +462,13 @@ async def list_campaigns(event, state: FSMContext) -> None:
                     f"{fmt(c.total_budget, currency)} · "
                     f"{c.billable_impressions:,} impressions"
                 )
-                rows.append([(f"{c.name[:28]} ({c.status.value})",
-                              f"campaign:view:{c.id}")])
+                rows.append([(f"{c.name[:28]} ({c.status.value})", f"campaign:view:{c.id}")])
             text = "\n".join(lines)
-    keyboard = menus._kb(rows + [[("⬅️ Back", "role:advertiser")]]) if rows \
+    keyboard = (
+        menus._kb([*rows, [("⬅️ Back", "role:advertiser")]])
+        if rows
         else menus.back_to("role:advertiser")
+    )
     await _edit_or_send(event, text, keyboard)
 
 
@@ -495,9 +485,7 @@ async def view_campaign(callback: CallbackQuery, state: FSMContext) -> None:
     except (AdNetError, ValueError) as exc:
         await callback.answer(getattr(exc, "message", "not found")[:190], show_alert=True)
         return
-    await callback.message.edit_text(
-        text, reply_markup=menus.campaign_actions(campaign_id, status)
-    )
+    await callback.message.edit_text(text, reply_markup=menus.campaign_actions(campaign_id, status))
     await callback.answer()
 
 
@@ -520,18 +508,14 @@ async def _transition(callback: CallbackQuery, action: str) -> None:
                 service.resume(campaign)
                 note = "▶️ Campaign resumed."
             else:
-                campaign, refund = RefundService(db).cancel_campaign(
-                    campaign, Actor.user(user)
-                )
+                campaign, refund = RefundService(db).cancel_campaign(campaign, Actor.user(user))
                 amount = fmt(refund.approved_amount, campaign.currency) if refund else "৳0"
                 note = f"✖️ Campaign cancelled. {amount} returned to your wallet."
             status = campaign.status.value
     except AdNetError as exc:
         await callback.answer(exc.message[:190], show_alert=True)
         return
-    await callback.message.edit_text(
-        note, reply_markup=menus.campaign_actions(campaign_id, status)
-    )
+    await callback.message.edit_text(note, reply_markup=menus.campaign_actions(campaign_id, status))
     await callback.answer()
 
 
@@ -580,15 +564,13 @@ async def start_deposit(event, state: FSMContext) -> None:
     with bot_session() as db:
         user = resolve_user(db, event.from_user)
         if not user.is_advertiser:
-            await _edit_or_send(event, texts.not_registered("an advertiser"),
-                                menus.back_to("menu"))
+            await _edit_or_send(event, texts.not_registered("an advertiser"), menus.back_to("menu"))
             return
         currency = user.advertiser.currency
     await state.set_state(Deposit.amount)
     await _edit_or_send(
         event,
-        "<b>➕ Add funds</b>\n\n"
-        f"How much would you like to add? Send an amount in {currency}.",
+        f"<b>➕ Add funds</b>\n\nHow much would you like to add? Send an amount in {currency}.",
         menus.cancel_only("role:advertiser"),
     )
 

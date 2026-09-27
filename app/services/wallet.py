@@ -157,9 +157,7 @@ class WalletService:
         if advertiser is not None:
             advertiser.lifetime_deposited = q(D(advertiser.lifetime_deposited) + amount)
 
-        self._statement(
-            wallet, result.transaction, amount, "available", description
-        )
+        self._statement(wallet, result.transaction, amount, "available", description)
         self.session.flush()
         return result.transaction
 
@@ -206,7 +204,11 @@ class WalletService:
         wallet.reserved_balance = q(D(wallet.reserved_balance) + amount)
         wallet.version += 1
         self._statement(
-            wallet, result.transaction, -amount, "available", description,
+            wallet,
+            result.transaction,
+            -amount,
+            "available",
+            description,
             campaign_id=campaign_id,
         )
         self.session.flush()
@@ -252,7 +254,11 @@ class WalletService:
         wallet.available_balance = q(D(wallet.available_balance) + amount)
         wallet.version += 1
         self._statement(
-            wallet, result.transaction, amount, "available", description,
+            wallet,
+            result.transaction,
+            amount,
+            "available",
+            description,
             campaign_id=campaign_id,
         )
         self.session.flush()

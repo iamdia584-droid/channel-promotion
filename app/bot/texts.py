@@ -138,8 +138,7 @@ def ask_amount(minimum: Decimal, currency: str, what: str = "amount") -> str:
 
 def not_registered(role: str) -> str:
     return (
-        f"You are not registered as {role} yet.\n"
-        "Use the main menu to enable it — it takes one tap."
+        f"You are not registered as {role} yet.\nUse the main menu to enable it — it takes one tap."
     )
 
 

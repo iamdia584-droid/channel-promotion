@@ -111,8 +111,11 @@ class PacingService:
         daily_remaining = q(D(campaign.daily_budget) - committed)
         if daily_remaining <= ZERO:
             return PacingDecision(
-                False, ZERO, "daily budget is exhausted",
-                daily_remaining=ZERO, spent_today=committed,
+                False,
+                ZERO,
+                "daily budget is exhausted",
+                daily_remaining=ZERO,
+                spent_today=committed,
             )
 
         burst = self.settings.decimal("pacing_burst_ratio")
@@ -121,21 +124,31 @@ class PacingService:
         hourly_remaining = q(allowance - committed)
         if hourly_remaining <= ZERO:
             return PacingDecision(
-                False, ZERO,
+                False,
+                ZERO,
                 f"ahead of pace: {committed} committed against an allowance of {allowance}",
-                daily_remaining=daily_remaining, hourly_target=target, spent_today=committed,
+                daily_remaining=daily_remaining,
+                hourly_target=target,
+                spent_today=committed,
             )
 
         headroom = min(daily_remaining, hourly_remaining, campaign_remaining)
         if headroom < amount:
             return PacingDecision(
-                False, headroom,
+                False,
+                headroom,
                 f"requested {amount} exceeds pacing headroom {headroom}",
-                daily_remaining=daily_remaining, hourly_target=target, spent_today=committed,
+                daily_remaining=daily_remaining,
+                hourly_target=target,
+                spent_today=committed,
             )
         return PacingDecision(
-            True, headroom, "", daily_remaining=daily_remaining,
-            hourly_target=target, spent_today=committed,
+            True,
+            headroom,
+            "",
+            daily_remaining=daily_remaining,
+            hourly_target=target,
+            spent_today=committed,
         )
 
     # -- counters ----------------------------------------------------------

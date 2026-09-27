@@ -60,8 +60,7 @@ class Assessment:
             "composite_score": self.score,
             "band": self.band.value,
             "signals": [
-                {"name": s.name, "score": s.score, "weight": str(s.weight),
-                 "evidence": s.evidence}
+                {"name": s.name, "score": s.score, "weight": str(s.weight), "evidence": s.evidence}
                 for s in self.signals
                 if s.score > 0
             ],
@@ -121,9 +120,7 @@ class FraudService:
         score = blend(signals)
         return Assessment(score, FraudBand.of(score), signals)
 
-    def _self_generated(
-        self, delivery: AdDelivery, telegram_user_id: int | None
-    ) -> Signal:
+    def _self_generated(self, delivery: AdDelivery, telegram_user_id: int | None) -> Signal:
         """The publisher (or the advertiser) clicking their own ad."""
         if telegram_user_id is None:
             return Signal("self_generated", 0)
@@ -145,7 +142,8 @@ class FraudService:
         for role, owner_id in owners.items():
             if owner_id == telegram_user_id:
                 return Signal(
-                    "self_generated", 95,
+                    "self_generated",
+                    95,
                     {"role": role, "telegram_user_id": telegram_user_id},
                     weight=Decimal("1.0"),
                 )
@@ -175,7 +173,8 @@ class FraudService:
         else:
             score = 0
         return Signal(
-            "ip_concentration", score,
+            "ip_concentration",
+            score,
             {"distinct_users_on_ip": distinct_users} if score else {},
             weight=Decimal("0.9"),
         )
@@ -202,7 +201,8 @@ class FraudService:
         ratio = recent / plausible
         score = min(95, int(40 + ratio * 10))
         return Signal(
-            "impossible_velocity", score,
+            "impossible_velocity",
+            score,
             {"impressions_in_last_minute": recent, "plausible_ceiling": plausible},
             weight=Decimal("0.95"),
         )
@@ -211,8 +211,7 @@ class FraudService:
         """A tracking-link hit with no user agent is usually a bot or a scanner."""
         if user_agent_hash:
             return Signal("missing_user_agent", 0)
-        return Signal("missing_user_agent", 30, {"user_agent": "absent"},
-                      weight=Decimal("0.5"))
+        return Signal("missing_user_agent", 30, {"user_agent": "absent"}, weight=Decimal("0.5"))
 
     def _repeat_identity(
         self, delivery: AdDelivery, telegram_user_id: int | None, occurred_at
@@ -235,7 +234,8 @@ class FraudService:
         if repeats <= 1:
             return Signal("repeat_identity", 0)
         return Signal(
-            "repeat_identity", min(80, 20 * repeats),
+            "repeat_identity",
+            min(80, 20 * repeats),
             {"hits_in_window": repeats, "window_minutes": window},
             weight=Decimal("0.7"),
         )
@@ -246,8 +246,10 @@ class FraudService:
         if channel is None or channel.fraud_score <= 30:
             return Signal("channel_history", 0)
         return Signal(
-            "channel_history", channel.fraud_score,
-            {"channel_fraud_score": channel.fraud_score}, weight=Decimal("0.6"),
+            "channel_history",
+            channel.fraud_score,
+            {"channel_fraud_score": channel.fraud_score},
+            weight=Decimal("0.6"),
         )
 
     # ------------------------------------------------------------------
@@ -280,7 +282,8 @@ class FraudService:
             return Signal("member_inflation", 0)
         shortfall = (floor - ratio) / floor  # 0 → 1 as views approach zero
         return Signal(
-            "member_inflation", int(min(Decimal(85), shortfall * Decimal(85))),
+            "member_inflation",
+            int(min(Decimal(85), shortfall * Decimal(85))),
             {
                 "members": members,
                 "avg_views": channel.avg_views,
@@ -307,7 +310,8 @@ class FraudService:
         if ratio <= limit:
             return Signal("view_spike", 0)
         return Signal(
-            "view_spike", int(min(Decimal(90), Decimal(40) + (ratio - limit) * Decimal(15))),
+            "view_spike",
+            int(min(Decimal(90), Decimal(40) + (ratio - limit) * Decimal(15))),
             {
                 "latest_avg_views": latest,
                 "trailing_baseline": int(baseline),
@@ -326,7 +330,8 @@ class FraudService:
         if ctr <= limit:
             return Signal("implausible_ctr", 0)
         return Signal(
-            "implausible_ctr", int(min(Decimal(88), Decimal(45) + (ctr - limit) * Decimal(150))),
+            "implausible_ctr",
+            int(min(Decimal(88), Decimal(45) + (ctr - limit) * Decimal(150))),
             {"ctr": str(ctr.quantize(Decimal("0.0001"))), "configured_limit": str(limit)},
             weight=Decimal("0.85"),
         )
@@ -341,7 +346,8 @@ class FraudService:
         if share < Decimal("0.05"):
             return Signal("member_growth_spike", 0)
         return Signal(
-            "member_growth_spike", int(min(Decimal(75), share * Decimal(600))),
+            "member_growth_spike",
+            int(min(Decimal(75), share * Decimal(600))),
             {"largest_daily_member_change": worst, "members": members},
             weight=Decimal("0.7"),
         )
@@ -361,9 +367,13 @@ class FraudService:
         if ratio < Decimal("0.3"):
             return Signal("invalid_impression_ratio", 0)
         return Signal(
-            "invalid_impression_ratio", int(min(Decimal(80), ratio * Decimal(100))),
-            {"invalid": invalid, "billable": billable,
-             "ratio": str(ratio.quantize(Decimal("0.0001")))},
+            "invalid_impression_ratio",
+            int(min(Decimal(80), ratio * Decimal(100))),
+            {
+                "invalid": invalid,
+                "billable": billable,
+                "ratio": str(ratio.quantize(Decimal("0.0001"))),
+            },
             weight=Decimal("0.75"),
         )
 
@@ -401,9 +411,12 @@ class FraudService:
         daily_cap = self.settings.money("max_withdrawal_per_day")
         if daily_cap > 0 and recent_earnings > daily_cap * Decimal("0.8"):
             signals.append(
-                Signal("rapid_cashout", 55,
-                       {"withdrawn_last_24h": str(recent_earnings),
-                        "daily_cap": str(daily_cap)}, weight=Decimal("0.7"))
+                Signal(
+                    "rapid_cashout",
+                    55,
+                    {"withdrawn_last_24h": str(recent_earnings), "daily_cap": str(daily_cap)},
+                    weight=Decimal("0.7"),
+                )
             )
 
         # A brand-new account withdrawing is worth a look.
@@ -411,14 +424,22 @@ class FraudService:
             age_days = (utcnow() - publisher.created_at).days
             if age_days < 7:
                 signals.append(
-                    Signal("new_account_withdrawal", 45,
-                           {"account_age_days": age_days}, weight=Decimal("0.6"))
+                    Signal(
+                        "new_account_withdrawal",
+                        45,
+                        {"account_age_days": age_days},
+                        weight=Decimal("0.6"),
+                    )
                 )
 
         if publisher is not None and publisher.fraud_strikes > 0:
             signals.append(
-                Signal("prior_fraud_strikes", min(85, 30 * publisher.fraud_strikes),
-                       {"strikes": publisher.fraud_strikes}, weight=Decimal("0.9"))
+                Signal(
+                    "prior_fraud_strikes",
+                    min(85, 30 * publisher.fraud_strikes),
+                    {"strikes": publisher.fraud_strikes},
+                    weight=Decimal("0.9"),
+                )
             )
 
         # The same payout destination used by several publishers.
@@ -429,9 +450,7 @@ class FraudService:
             if method is not None:
                 shared = int(
                     self.session.scalar(
-                        select(
-                            func.count(func.distinct(PayoutMethodRecord.publisher_id))
-                        ).where(
+                        select(func.count(func.distinct(PayoutMethodRecord.publisher_id))).where(
                             PayoutMethodRecord.destination_fingerprint
                             == method.destination_fingerprint
                         )
@@ -440,9 +459,12 @@ class FraudService:
                 )
                 if shared > 1:
                     signals.append(
-                        Signal("shared_payout_destination", min(90, 35 * shared),
-                               {"publishers_sharing_destination": shared},
-                               weight=Decimal("0.9"))
+                        Signal(
+                            "shared_payout_destination",
+                            min(90, 35 * shared),
+                            {"publishers_sharing_destination": shared},
+                            weight=Decimal("0.9"),
+                        )
                     )
 
         # Channels behind this publisher currently scoring badly.
@@ -456,8 +478,12 @@ class FraudService:
         )
         if worst > 30:
             signals.append(
-                Signal("channel_fraud_history", worst,
-                       {"worst_channel_fraud_score": worst}, weight=Decimal("0.8"))
+                Signal(
+                    "channel_fraud_history",
+                    worst,
+                    {"worst_channel_fraud_score": worst},
+                    weight=Decimal("0.8"),
+                )
             )
 
         if not signals:
@@ -576,9 +602,13 @@ class FraudService:
             assessment = self.audit_delivery(delivery)
             delivery.fraud_score = assessment.score
             event = self.record_event(
-                FraudSubject.DELIVERY, delivery.id, assessment,
-                publisher_id=delivery.publisher_id, campaign_id=delivery.campaign_id,
-                channel_id=delivery.channel_id, delivery_id=delivery.id,
+                FraudSubject.DELIVERY,
+                delivery.id,
+                assessment,
+                publisher_id=delivery.publisher_id,
+                campaign_id=delivery.campaign_id,
+                channel_id=delivery.channel_id,
+                delivery_id=delivery.id,
                 amount_at_risk=delivery.settled_amount or delivery.reserved_amount,
             )
             if event is not None:
@@ -599,9 +629,7 @@ class FraudService:
         ).all()
         total = int(
             self.session.scalar(
-                select(func.count(Impression.id)).where(
-                    Impression.delivery_id == delivery.id
-                )
+                select(func.count(Impression.id)).where(Impression.delivery_id == delivery.id)
             )
             or 0
         )
@@ -609,9 +637,15 @@ class FraudService:
             top_share = D(int(rows[0][1])) / D(total)
             if top_share > Decimal("0.25"):
                 signals.append(
-                    Signal("ip_concentration", int(min(Decimal(90), top_share * Decimal(140))),
-                           {"top_ip_share": str(top_share.quantize(Decimal("0.0001"))),
-                            "total_impressions": total}, weight=Decimal("0.9"))
+                    Signal(
+                        "ip_concentration",
+                        int(min(Decimal(90), top_share * Decimal(140))),
+                        {
+                            "top_ip_share": str(top_share.quantize(Decimal("0.0001"))),
+                            "total_impressions": total,
+                        },
+                        weight=Decimal("0.9"),
+                    )
                 )
 
         # Duplicate/capped/fraudulent ratio.
@@ -628,8 +662,12 @@ class FraudService:
         )
         if total >= 50 and invalid / total > 0.3:
             signals.append(
-                Signal("invalid_traffic_ratio", int(min(85, (invalid / total) * 100)),
-                       {"invalid": invalid, "total": total}, weight=Decimal("0.8"))
+                Signal(
+                    "invalid_traffic_ratio",
+                    int(min(85, (invalid / total) * 100)),
+                    {"invalid": invalid, "total": total},
+                    weight=Decimal("0.8"),
+                )
             )
 
         # CTR far above plausibility for this delivery.
@@ -638,10 +676,12 @@ class FraudService:
             limit = self.settings.decimal("fraud_max_ctr")
             if ctr > limit:
                 signals.append(
-                    Signal("implausible_ctr", int(min(Decimal(85), Decimal(45) +
-                                                      (ctr - limit) * Decimal(150))),
-                           {"ctr": str(ctr.quantize(Decimal("0.0001")))},
-                           weight=Decimal("0.85"))
+                    Signal(
+                        "implausible_ctr",
+                        int(min(Decimal(85), Decimal(45) + (ctr - limit) * Decimal(150))),
+                        {"ctr": str(ctr.quantize(Decimal("0.0001")))},
+                        weight=Decimal("0.85"),
+                    )
                 )
 
         invalid_clicks = int(
@@ -654,8 +694,12 @@ class FraudService:
         )
         if invalid_clicks >= 5:
             signals.append(
-                Signal("invalid_clicks", min(70, 10 * invalid_clicks),
-                       {"invalid_clicks": invalid_clicks}, weight=Decimal("0.6"))
+                Signal(
+                    "invalid_clicks",
+                    min(70, 10 * invalid_clicks),
+                    {"invalid_clicks": invalid_clicks},
+                    weight=Decimal("0.6"),
+                )
             )
 
         if not signals:

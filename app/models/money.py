@@ -16,18 +16,19 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+)
+from sqlalchemy import (
     text as sa_text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, GUID, Money, StrEnumType, Timestamped, UTCDateTime, UUIDPk
+from app.db.base import GUID, Base, Money, StrEnumType, Timestamped, UTCDateTime, UUIDPk
 from app.models.enums import (
     AccountKind,
     AccountOwnerType,
@@ -60,11 +61,15 @@ class LedgerAccount(UUIDPk, Timestamped, Base):
 
     __tablename__ = "ledger_accounts"
 
-    owner_type: Mapped[AccountOwnerType] = mapped_column(StrEnumType(AccountOwnerType, 16), nullable=False)
+    owner_type: Mapped[AccountOwnerType] = mapped_column(
+        StrEnumType(AccountOwnerType, 16), nullable=False
+    )
     owner_id: Mapped[uuid.UUID | None] = mapped_column(GUID)  # NULL for platform accounts
     kind: Mapped[AccountKind] = mapped_column(StrEnumType(AccountKind, 32), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
-    normal_side: Mapped[EntryDirection] = mapped_column(StrEnumType(EntryDirection, 8), nullable=False)
+    normal_side: Mapped[EntryDirection] = mapped_column(
+        StrEnumType(EntryDirection, 8), nullable=False
+    )
     balance: Mapped[object] = mapped_column(Money, default="0", nullable=False)
     label: Mapped[str | None] = mapped_column(String(120))
 
@@ -120,11 +125,9 @@ class LedgerTransaction(UUIDPk, Base):
     meta: Mapped[dict] = mapped_column(default=dict, nullable=False)
     actor_type: Mapped[str | None] = mapped_column(String(24))
     actor_id: Mapped[str | None] = mapped_column(String(64))
-    created_at: Mapped[datetime] = mapped_column(
-        UTCDateTime(), nullable=False, index=True
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, index=True)
 
-    entries: Mapped[list["LedgerEntry"]] = relationship(
+    entries: Mapped[list[LedgerEntry]] = relationship(
         back_populates="transaction", cascade="all, delete-orphan", lazy="selectin"
     )
 
@@ -146,13 +149,13 @@ class LedgerEntry(UUIDPk, Base):
     account_id: Mapped[uuid.UUID] = mapped_column(
         GUID, ForeignKey("ledger_accounts.id", ondelete="RESTRICT"), nullable=False, index=True
     )
-    direction: Mapped[EntryDirection] = mapped_column(StrEnumType(EntryDirection, 8), nullable=False)
+    direction: Mapped[EntryDirection] = mapped_column(
+        StrEnumType(EntryDirection, 8), nullable=False
+    )
     amount: Mapped[object] = mapped_column(Money, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     balance_after: Mapped[object] = mapped_column(Money, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        UTCDateTime(), nullable=False, index=True
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, index=True)
     meta: Mapped[dict] = mapped_column(default=dict, nullable=False)
 
     transaction: Mapped[LedgerTransaction] = relationship(back_populates="entries")
@@ -197,8 +200,8 @@ class Wallet(UUIDPk, Timestamped, Base):
 
     version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    advertiser: Mapped["Advertiser | None"] = relationship(back_populates="wallet")
-    publisher: Mapped["Publisher | None"] = relationship(back_populates="wallet")
+    advertiser: Mapped[Advertiser | None] = relationship(back_populates="wallet")
+    publisher: Mapped[Publisher | None] = relationship(back_populates="wallet")
 
     __table_args__ = (
         CheckConstraint(
@@ -227,7 +230,9 @@ class WalletTransaction(UUIDPk, Base):
     ledger_transaction_id: Mapped[uuid.UUID] = mapped_column(
         GUID, ForeignKey("ledger_transactions.id", ondelete="RESTRICT"), nullable=False
     )
-    transaction_type: Mapped[TransactionType] = mapped_column(StrEnumType(TransactionType, 32), nullable=False)
+    transaction_type: Mapped[TransactionType] = mapped_column(
+        StrEnumType(TransactionType, 32), nullable=False
+    )
     # Signed from the user's point of view: +credit to them, -debit from them.
     signed_amount: Mapped[object] = mapped_column(Money, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
@@ -235,9 +240,7 @@ class WalletTransaction(UUIDPk, Base):
     bucket: Mapped[str] = mapped_column(String(24), nullable=False)  # available/pending/...
     description: Mapped[str | None] = mapped_column(String(300))
     campaign_id: Mapped[uuid.UUID | None] = mapped_column(GUID)
-    created_at: Mapped[datetime] = mapped_column(
-        UTCDateTime(), nullable=False, index=True
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, index=True)
     meta: Mapped[dict] = mapped_column(default=dict, nullable=False)
 
     __table_args__ = (Index("ix_wallet_transactions_wallet_created", "wallet_id", "created_at"),)
@@ -270,16 +273,12 @@ class PublisherEarning(UUIDPk, Base):
     net_amount: Mapped[object] = mapped_column(Money, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
 
-    confirm_after: Mapped[datetime] = mapped_column(
-        UTCDateTime(), nullable=False, index=True
-    )
+    confirm_after: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, index=True)
     confirmed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     reversed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     reversal_reason: Mapped[str | None] = mapped_column(String(300))
     fraud_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        UTCDateTime(), nullable=False, index=True
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, index=True)
 
     __table_args__ = (
         UniqueConstraint(
@@ -384,7 +383,10 @@ class Withdrawal(UUIDPk, Timestamped, Base):
         GUID, ForeignKey("payout_methods.id", ondelete="RESTRICT")
     )
     status: Mapped[WithdrawalStatus] = mapped_column(
-        StrEnumType(WithdrawalStatus, 16), default=WithdrawalStatus.PENDING, nullable=False, index=True
+        StrEnumType(WithdrawalStatus, 16),
+        default=WithdrawalStatus.PENDING,
+        nullable=False,
+        index=True,
     )
     amount: Mapped[object] = mapped_column(Money, nullable=False)
     fee: Mapped[object] = mapped_column(Money, default="0", nullable=False)

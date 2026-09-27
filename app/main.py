@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -52,8 +52,7 @@ if settings.cors_origin_list:
         allow_origins=settings.cors_origin_list,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-        allow_headers=["Authorization", "Content-Type", "Idempotency-Key",
-                       "X-Telegram-Init-Data"],
+        allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Telegram-Init-Data"],
     )
 
 
@@ -89,9 +88,7 @@ async def domain_error_handler(request: Request, exc: AdNetError) -> JSONRespons
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_error_handler(
-    request: Request, exc: RequestValidationError
-) -> JSONResponse:
+async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     return JSONResponse(
         status_code=422,
         content={
@@ -110,8 +107,13 @@ async def unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
     log.exception("unhandled_error", path=request.url.path)
     return JSONResponse(
         status_code=500,
-        content={"error": {"code": "internal_error",
-                           "message": "an internal error occurred", "context": {}}},
+        content={
+            "error": {
+                "code": "internal_error",
+                "message": "an internal error occurred",
+                "context": {},
+            }
+        },
     )
 
 
@@ -130,9 +132,9 @@ def _safe_errors(errors: list) -> list[dict]:
 
 # --- routes ---------------------------------------------------------------
 
-from app.admin.routes import router as admin_ui_router  # noqa: E402
-from app.api.v1 import admin, advertisers, auth, publishers, tracking  # noqa: E402
-from app.bot.webhook import router as webhook_router  # noqa: E402
+from app.admin.routes import router as admin_ui_router
+from app.api.v1 import admin, advertisers, auth, publishers, tracking
+from app.bot.webhook import router as webhook_router
 
 API_PREFIX = "/api/v1"
 app.include_router(auth.router, prefix=API_PREFIX)
@@ -143,10 +145,10 @@ app.include_router(tracking.router)
 app.include_router(webhook_router)
 app.include_router(admin_ui_router)
 
-try:
+# The directory may be absent in a slim image; the dashboard has no hard
+# dependency on static assets.
+with suppress(Exception):
     app.mount("/admin/static", StaticFiles(directory="app/admin/static"), name="admin-static")
-except Exception:  # pragma: no cover - directory may be absent in a slim image
-    pass
 
 
 @app.get("/health", tags=["ops"])

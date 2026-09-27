@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
-    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -22,7 +21,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, GUID, Money, StrEnumType, TelegramId, Timestamped, UTCDateTime, UUIDPk
+from app.db.base import GUID, Base, Money, StrEnumType, TelegramId, Timestamped, UTCDateTime, UUIDPk
 from app.models.enums import Role, UserStatus
 
 if TYPE_CHECKING:
@@ -59,10 +58,10 @@ class User(UUIDPk, Timestamped, Base):
     signup_source: Mapped[str | None] = mapped_column(String(32))
     meta: Mapped[dict] = mapped_column(default=dict, nullable=False)
 
-    advertiser: Mapped["Advertiser | None"] = relationship(
+    advertiser: Mapped[Advertiser | None] = relationship(
         back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
-    publisher: Mapped["Publisher | None"] = relationship(
+    publisher: Mapped[Publisher | None] = relationship(
         back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
 
@@ -116,7 +115,7 @@ class Advertiser(UUIDPk, Timestamped, Base):
     meta: Mapped[dict] = mapped_column(default=dict, nullable=False)
 
     user: Mapped[User] = relationship(back_populates="advertiser")
-    wallet: Mapped["Wallet | None"] = relationship(
+    wallet: Mapped[Wallet | None] = relationship(
         back_populates="advertiser", uselist=False, cascade="all, delete-orphan"
     )
 
@@ -154,10 +153,10 @@ class Publisher(UUIDPk, Timestamped, Base):
     meta: Mapped[dict] = mapped_column(default=dict, nullable=False)
 
     user: Mapped[User] = relationship(back_populates="publisher")
-    wallet: Mapped["Wallet | None"] = relationship(
+    wallet: Mapped[Wallet | None] = relationship(
         back_populates="publisher", uselist=False, cascade="all, delete-orphan"
     )
-    channels: Mapped[list["PublisherChannel"]] = relationship(
+    channels: Mapped[list[PublisherChannel]] = relationship(
         back_populates="publisher", cascade="all, delete-orphan"
     )
 

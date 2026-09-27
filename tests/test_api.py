@@ -29,8 +29,7 @@ def _campaign_body(**kw) -> dict:
         "body_text": "Join our exam preparation course today",
         "destination_url": "https://example.com/course",
         "cta_text": "Enrol now",
-        "targeting": {"countries": ["BD"], "categories": ["education"],
-                      "languages": ["bn"]},
+        "targeting": {"countries": ["BD"], "categories": ["education"], "languages": ["bn"]},
     }
     body.update(kw)
     return body
@@ -53,8 +52,7 @@ def test_unauthenticated_requests_are_rejected(client):
 
 
 def test_garbage_token_is_rejected(client):
-    response = client.get("/api/v1/advertisers/me/wallet",
-                          headers=_auth("not-a-real-token"))
+    response = client.get("/api/v1/advertisers/me/wallet", headers=_auth("not-a-real-token"))
     assert response.status_code == 401
 
 
@@ -68,14 +66,20 @@ def test_publisher_cannot_reach_advertiser_endpoints(client, api_token):
 
 def test_advertiser_cannot_reach_publisher_endpoints(client, api_token):
     token, _ = api_token(advertiser=True)
-    assert client.get("/api/v1/publishers/me/earnings/summary",
-                      headers=_auth(token)).status_code == 403
+    assert (
+        client.get("/api/v1/publishers/me/earnings/summary", headers=_auth(token)).status_code
+        == 403
+    )
 
 
 def test_ordinary_user_cannot_reach_admin_endpoints(client, api_token):
     token, _ = api_token(advertiser=True, publisher=True)
-    for path in ["/api/v1/admin/overview", "/api/v1/admin/settings",
-                 "/api/v1/admin/audit", "/api/v1/admin/withdrawals/queue"]:
+    for path in [
+        "/api/v1/admin/overview",
+        "/api/v1/admin/settings",
+        "/api/v1/admin/audit",
+        "/api/v1/admin/withdrawals/queue",
+    ]:
         assert client.get(path, headers=_auth(token)).status_code == 403, path
 
 
@@ -111,12 +115,12 @@ def test_float_budget_is_rejected(client, api_token):
     token, _ = api_token(advertiser=True)
     response = client.post(
         "/api/v1/advertisers/me/campaigns",
-        json=_campaign_body(total_budget=10000.5), headers=_auth(token),
+        json=_campaign_body(total_budget=10000.5),
+        headers=_auth(token),
     )
     assert response.status_code == 422
     assert any(
-        "string" in d["message"].lower()
-        for d in response.json()["error"]["context"]["details"]
+        "string" in d["message"].lower() for d in response.json()["error"]["context"]["details"]
     )
 
 
@@ -127,8 +131,9 @@ def test_float_budget_is_rejected(client, api_token):
 
 def test_campaign_create_read_and_preview(client, api_token):
     token, _ = api_token(advertiser=True)
-    created = client.post("/api/v1/advertisers/me/campaigns",
-                          json=_campaign_body(), headers=_auth(token))
+    created = client.post(
+        "/api/v1/advertisers/me/campaigns", json=_campaign_body(), headers=_auth(token)
+    )
     assert created.status_code == 201, created.text
     campaign = created.json()
     assert campaign["status"] == "draft"
@@ -136,13 +141,13 @@ def test_campaign_create_read_and_preview(client, api_token):
     assert campaign["bid_cpm"] == "50.000000"
 
     campaign_id = campaign["id"]
-    fetched = client.get(f"/api/v1/advertisers/me/campaigns/{campaign_id}",
-                         headers=_auth(token))
+    fetched = client.get(f"/api/v1/advertisers/me/campaigns/{campaign_id}", headers=_auth(token))
     assert fetched.status_code == 200
     assert fetched.json()["name"] == "Exam Preparation 2026"
 
-    preview = client.get(f"/api/v1/advertisers/me/campaigns/{campaign_id}/preview",
-                         headers=_auth(token))
+    preview = client.get(
+        f"/api/v1/advertisers/me/campaigns/{campaign_id}/preview", headers=_auth(token)
+    )
     assert preview.status_code == 200
     # ৳10,000 at ৳50 CPM = 200,000 impressions — and flagged as an estimate.
     assert preview.json()["estimated_impressions"] == 200_000
@@ -169,11 +174,11 @@ def test_reusing_an_idempotency_key_with_a_different_body_is_a_conflict(client, 
     """Silently returning the cached response would be the wrong answer."""
     token, _ = api_token(advertiser=True)
     headers = {**_auth(token), "Idempotency-Key": "same-key"}
-    client.post("/api/v1/advertisers/me/campaigns",
-                json=_campaign_body(), headers=headers)
+    client.post("/api/v1/advertisers/me/campaigns", json=_campaign_body(), headers=headers)
     conflict = client.post(
         "/api/v1/advertisers/me/campaigns",
-        json=_campaign_body(name="A completely different campaign"), headers=headers,
+        json=_campaign_body(name="A completely different campaign"),
+        headers=headers,
     )
     assert conflict.status_code == 409
     assert conflict.json()["error"]["code"] == "conflict"
@@ -182,19 +187,20 @@ def test_reusing_an_idempotency_key_with_a_different_body_is_a_conflict(client, 
 def test_another_advertisers_campaign_is_not_readable(client, api_token):
     mine, _ = api_token(advertiser=True)
     theirs, _ = api_token(advertiser=True)
-    created = client.post("/api/v1/advertisers/me/campaigns",
-                          json=_campaign_body(), headers=_auth(theirs))
+    created = client.post(
+        "/api/v1/advertisers/me/campaigns", json=_campaign_body(), headers=_auth(theirs)
+    )
     campaign_id = created.json()["id"]
-    response = client.get(f"/api/v1/advertisers/me/campaigns/{campaign_id}",
-                          headers=_auth(mine))
+    response = client.get(f"/api/v1/advertisers/me/campaigns/{campaign_id}", headers=_auth(mine))
     # 404 rather than 403: confirming existence would leak that the id is real.
     assert response.status_code == 404
 
 
 def test_submitting_without_funds_reports_insufficient_funds(client, api_token):
     token, _ = api_token(advertiser=True)
-    created = client.post("/api/v1/advertisers/me/campaigns",
-                          json=_campaign_body(), headers=_auth(token))
+    created = client.post(
+        "/api/v1/advertisers/me/campaigns", json=_campaign_body(), headers=_auth(token)
+    )
     campaign_id = created.json()["id"]
     response = client.post(
         f"/api/v1/advertisers/me/campaigns/{campaign_id}/submit", headers=_auth(token)
@@ -216,8 +222,9 @@ def test_submitting_without_funds_reports_insufficient_funds(client, api_token):
 )
 def test_invalid_campaign_bodies_are_rejected(client, api_token, bad):
     token, _ = api_token(advertiser=True)
-    response = client.post("/api/v1/advertisers/me/campaigns",
-                           json=_campaign_body(**bad), headers=_auth(token))
+    response = client.post(
+        "/api/v1/advertisers/me/campaigns", json=_campaign_body(**bad), headers=_auth(token)
+    )
     assert response.status_code in (400, 422), response.text
 
 
@@ -226,8 +233,9 @@ def test_inverted_schedule_is_rejected_at_the_schema(client, api_token):
     now = utcnow()
     response = client.post(
         "/api/v1/advertisers/me/campaigns",
-        json=_campaign_body(starts_at=now.isoformat(),
-                            ends_at=(now - timedelta(days=1)).isoformat()),
+        json=_campaign_body(
+            starts_at=now.isoformat(), ends_at=(now - timedelta(days=1)).isoformat()
+        ),
         headers=_auth(token),
     )
     assert response.status_code == 422
@@ -242,8 +250,9 @@ def test_registering_an_unowned_channel_is_refused(client, api_token, db):
     token, user = api_token(publisher=True)
     # Bot is admin, but someone else owns the chat.
     client.gateway.register_chat(-100777, username="notmine", owner_id=424242)
-    response = client.post("/api/v1/publishers/me/channels",
-                           json={"identifier": "@notmine"}, headers=_auth(token))
+    response = client.post(
+        "/api/v1/publishers/me/channels", json={"identifier": "@notmine"}, headers=_auth(token)
+    )
     assert response.status_code == 422
     assert "not an owner or administrator" in response.json()["error"]["message"]
 
@@ -251,7 +260,10 @@ def test_registering_an_unowned_channel_is_refused(client, api_token, db):
 def test_registering_an_owned_channel_succeeds(client, api_token, db):
     token, user = api_token(publisher=True)
     client.gateway.register_chat(
-        -100778, username="mychan", title="My Channel", members=30_000,
+        -100778,
+        username="mychan",
+        title="My Channel",
+        members=30_000,
         owner_id=user.telegram_user_id,
     )
     response = client.post(
@@ -275,7 +287,8 @@ def test_payout_destination_is_never_returned_in_full(client, api_token):
     token, _ = api_token(publisher=True)
     created = client.post(
         "/api/v1/publishers/me/payout-methods",
-        json={"method": "bkash", "destination": "01712345678"}, headers=_auth(token),
+        json={"method": "bkash", "destination": "01712345678"},
+        headers=_auth(token),
     )
     assert created.status_code == 201
     body = created.json()
@@ -288,7 +301,8 @@ def test_invalid_payout_number_is_rejected(client, api_token):
     token, _ = api_token(publisher=True)
     response = client.post(
         "/api/v1/publishers/me/payout-methods",
-        json={"method": "bkash", "destination": "12345"}, headers=_auth(token),
+        json={"method": "bkash", "destination": "12345"},
+        headers=_auth(token),
     )
     assert response.status_code == 422
     assert "01" in response.json()["error"]["message"]
@@ -298,11 +312,13 @@ def test_withdrawal_without_confirmed_balance_is_refused(client, api_token):
     token, _ = api_token(publisher=True)
     method = client.post(
         "/api/v1/publishers/me/payout-methods",
-        json={"method": "bkash", "destination": "01712345678"}, headers=_auth(token),
+        json={"method": "bkash", "destination": "01712345678"},
+        headers=_auth(token),
     ).json()
     response = client.post(
         "/api/v1/publishers/me/withdrawals",
-        json={"amount": "1000", "payout_method_id": method["id"]}, headers=_auth(token),
+        json={"amount": "1000", "payout_method_id": method["id"]},
+        headers=_auth(token),
     )
     assert response.status_code in (409, 422)
 
@@ -310,13 +326,15 @@ def test_withdrawal_without_confirmed_balance_is_refused(client, api_token):
 def test_another_publishers_channel_is_not_readable(client, api_token):
     mine, _ = api_token(publisher=True)
     theirs, their_user = api_token(publisher=True)
-    client.gateway.register_chat(-100779, username="theirs",
-                                 owner_id=their_user.telegram_user_id)
-    created = client.post("/api/v1/publishers/me/channels",
-                          json={"identifier": "@theirs"}, headers=_auth(theirs))
+    client.gateway.register_chat(-100779, username="theirs", owner_id=their_user.telegram_user_id)
+    created = client.post(
+        "/api/v1/publishers/me/channels", json={"identifier": "@theirs"}, headers=_auth(theirs)
+    )
     channel_id = created.json()["id"]
-    assert client.get(f"/api/v1/publishers/me/channels/{channel_id}",
-                      headers=_auth(mine)).status_code == 404
+    assert (
+        client.get(f"/api/v1/publishers/me/channels/{channel_id}", headers=_auth(mine)).status_code
+        == 404
+    )
 
 
 # --------------------------------------------------------------------------
@@ -395,7 +413,8 @@ def test_webhook_rejects_a_wrong_secret_token(client, monkeypatch):
 
     monkeypatch.setattr(app_settings, "telegram_webhook_secret", "the-secret")
     response = client.post(
-        "/telegram/webhook", json={"update_id": 1},
+        "/telegram/webhook",
+        json={"update_id": 1},
         headers={"X-Telegram-Bot-Api-Secret-Token": "wrong"},
     )
     assert response.status_code == 401

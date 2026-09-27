@@ -92,9 +92,7 @@ def current_principal(
         telegram_id = int(raw.get("id", 0))
         if not telegram_id:
             raise Unauthenticated("initData carries no user id")
-        user = db.scalars(
-            select(User).where(User.telegram_user_id == telegram_id)
-        ).one_or_none()
+        user = db.scalars(select(User).where(User.telegram_user_id == telegram_id)).one_or_none()
         if user is None:
             raise Unauthenticated("no account for this Telegram user yet")
         if not user.is_active:
@@ -155,8 +153,10 @@ def throttle(bucket: str, limit: int, window: int = 60):
 
     def _dep(request: Request, principal: CurrentPrincipal) -> None:
         identity = (
-            str(principal.user.id) if principal.user
-            else str(principal.staff.id) if principal.staff
+            str(principal.user.id)
+            if principal.user
+            else str(principal.staff.id)
+            if principal.staff
             else (request.client.host if request.client else "anonymous")
         )
         rate_limit(f"{bucket}:{identity}", limit, window)
