@@ -21,6 +21,7 @@ Two documents explain the decisions that shape everything else:
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — layering, the chart of
   accounts, the money-flow table for every event, and the pricing formula.
 
+[docs/DEPLOY.md](docs/DEPLOY.md) is the deployment guide.
 [docs/ROADMAP.md](docs/ROADMAP.md) states what is built and what is deliberately
 deferred.
 
