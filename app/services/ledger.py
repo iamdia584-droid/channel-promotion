@@ -51,11 +51,12 @@ NORMAL_SIDE: dict[AccountKind, EntryDirection] = {
     AccountKind.ADVERTISER_RESERVED: EntryDirection.CREDIT,
     AccountKind.PUBLISHER_PENDING: EntryDirection.CREDIT,
     AccountKind.PUBLISHER_CONFIRMED: EntryDirection.CREDIT,
-    AccountKind.PUBLISHER_PAID: EntryDirection.DEBIT,
     AccountKind.PLATFORM_REVENUE: EntryDirection.CREDIT,
     AccountKind.PLATFORM_FEES: EntryDirection.CREDIT,
+    # The platform's own cash position: debited when an advertiser deposits,
+    # credited when a publisher is paid.
     AccountKind.GATEWAY_CLEARING: EntryDirection.DEBIT,
-    AccountKind.PAYOUT_CLEARING: EntryDirection.DEBIT,
+    AccountKind.PAYOUT_CLEARING: EntryDirection.CREDIT,
     AccountKind.FRAUD_CLAWBACK: EntryDirection.CREDIT,
 }
 
@@ -67,6 +68,9 @@ NON_NEGATIVE: frozenset[AccountKind] = frozenset(
         AccountKind.ADVERTISER_RESERVED,
         AccountKind.PUBLISHER_PENDING,
         AccountKind.PUBLISHER_CONFIRMED,
+        # Paying out more than was committed would mean sending money we never
+        # took from a balance.
+        AccountKind.PAYOUT_CLEARING,
     }
 )
 
@@ -75,7 +79,6 @@ OWNER_FOR_KIND: dict[AccountKind, AccountOwnerType] = {
     AccountKind.ADVERTISER_RESERVED: AccountOwnerType.ADVERTISER,
     AccountKind.PUBLISHER_PENDING: AccountOwnerType.PUBLISHER,
     AccountKind.PUBLISHER_CONFIRMED: AccountOwnerType.PUBLISHER,
-    AccountKind.PUBLISHER_PAID: AccountOwnerType.PUBLISHER,
     AccountKind.PLATFORM_REVENUE: AccountOwnerType.PLATFORM,
     AccountKind.PLATFORM_FEES: AccountOwnerType.PLATFORM,
     AccountKind.GATEWAY_CLEARING: AccountOwnerType.PLATFORM,

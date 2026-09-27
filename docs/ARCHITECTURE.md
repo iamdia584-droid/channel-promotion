@@ -73,12 +73,16 @@ ADVERTISER_RESERVED    liability  committed to a campaign, not yet spent
 ADVERTISER_SPENT       revenue    recognised ad spend
 PUBLISHER_PENDING      liability  earned, inside validation window
 PUBLISHER_CONFIRMED    liability  withdrawable
-PUBLISHER_PAID         liability  paid out (contra)
 PLATFORM_REVENUE       revenue    our margin
 PLATFORM_FEES          revenue    withdrawal fees
-GATEWAY_CLEARING       asset      funds in transit from a payment provider
-PAYOUT_CLEARING        asset      funds in transit to a publisher
+GATEWAY_CLEARING       asset      the platform's cash position
+PAYOUT_CLEARING        liability  payouts committed but not yet sent
 FRAUD_CLAWBACK         revenue    reversed earnings
+
+There is no ADVERTISER_SPENT or PUBLISHER_PAID account. Cumulative advertiser
+spend is the sum of that advertiser's SETTLEMENT postings, and cumulative payout
+the sum of their WITHDRAWAL_PAID postings. An account that is debited and credited
+the same amount in one movement nets to zero and tracks nothing.
 ```
 
 ## Money flows
@@ -92,7 +96,7 @@ FRAUD_CLAWBACK         revenue    reversed earnings
 | Earnings confirmed | PUBLISHER_PENDING | PUBLISHER_CONFIRMED |
 | Earnings reversed (fraud) | PUBLISHER_PENDING | FRAUD_CLAWBACK |
 | Withdrawal requested | PUBLISHER_CONFIRMED | PAYOUT_CLEARING + PLATFORM_FEES |
-| Withdrawal paid | PAYOUT_CLEARING | PUBLISHER_PAID |
+| Withdrawal paid | PAYOUT_CLEARING | GATEWAY_CLEARING |
 | Withdrawal rejected | PAYOUT_CLEARING + PLATFORM_FEES | PUBLISHER_CONFIRMED |
 | Refund | ADVERTISER_RESERVED | ADVERTISER_AVAILABLE (or GATEWAY_CLEARING for cash-out) |
 

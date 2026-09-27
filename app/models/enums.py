@@ -176,7 +176,6 @@ class AccountKind(StrEnum):
     ADVERTISER_RESERVED = "advertiser_reserved"
     PUBLISHER_PENDING = "publisher_pending"
     PUBLISHER_CONFIRMED = "publisher_confirmed"
-    PUBLISHER_PAID = "publisher_paid"
     PLATFORM_REVENUE = "platform_revenue"
     PLATFORM_FEES = "platform_fees"
     GATEWAY_CLEARING = "gateway_clearing"
