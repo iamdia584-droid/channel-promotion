@@ -488,8 +488,14 @@ class AnalyticsService:
 
     @staticmethod
     def to_csv(rows: Iterable[dict[str, Any]], columns: list[str] | None = None) -> str:
+        """Render rows as CSV.
+
+        When the caller names the columns, the header is written even for an empty
+        result: a zero-byte download tells the recipient nothing, while a header
+        row says plainly that the period had no activity.
+        """
         rows = list(rows)
-        if not rows:
+        if not rows and not columns:
             return ""
         columns = columns or list(rows[0].keys())
         buffer = io.StringIO()

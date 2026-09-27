@@ -179,8 +179,18 @@ def test_csv_never_uses_scientific_notation(db):
     assert "1000" in output and "0.000001" in output
 
 
-def test_empty_csv_is_empty_not_a_crash(db):
+def test_empty_csv_with_named_columns_still_has_a_header(db):
+    """A zero-byte download tells the recipient nothing."""
+    output = AnalyticsService.to_csv([], ["date", "spend"])
+    assert output.strip() == "date,spend"
+    # With no columns to name there is nothing meaningful to emit.
     assert AnalyticsService.to_csv([]) == ""
+
+
+def test_financial_report_has_a_header_even_with_no_activity(db):
+    output = AnalyticsService(db).financial_report_csv()
+    assert output.startswith("date,gross_ad_spend")
+    assert "net_revenue" in output
 
 
 def test_reversed_earnings_are_excluded_from_publisher_totals(db, sent_delivery):

@@ -524,3 +524,93 @@ def test_internal_errors_do_not_leak_details(client, api_token, monkeypatch):
     assert response.status_code == 500
     assert "secret internal detail" not in response.text
     assert response.json()["error"]["code"] == "internal_error"
+
+
+# --------------------------------------------------------------------------
+# Staff authentication on the REST API
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture
+def signed_in_admin(client, db, make_staff):
+    """Sign a staff member in and return their CSRF token."""
+    from app.core.security import hash_password
+
+    staff = make_staff(email="apiadmin@example.com")
+    staff.password_hash = hash_password("correct-horse-battery")
+    db.commit()
+    response = client.post(
+        "/admin/login",
+        data={"email": "apiadmin@example.com", "password": "correct-horse-battery"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    return client.cookies.get("adnet_csrf")
+
+
+def test_dashboard_session_authenticates_staff_api_reads(client, signed_in_admin):
+    """The dashboard and the API are two doors to one service.
+
+    Regression: nothing could satisfy the staff dependencies at all, so every
+    /api/v1/admin route was unreachable and the dashboard's own export links 401'd.
+    """
+    overview = client.get("/api/v1/admin/overview")
+    assert overview.status_code == 200
+    assert "gross_ad_spend" in overview.json()
+
+    report = client.get("/api/v1/admin/reports/financial.csv")
+    assert report.status_code == 200
+    assert report.headers["content-type"].startswith("text/csv")
+    assert "net_revenue" in report.text
+
+
+def test_cookie_authenticated_mutation_requires_a_csrf_header(client, signed_in_admin):
+    """A cookie travels automatically, so a mutation needs separate proof."""
+    without = client.put("/api/v1/admin/settings/base_cpm", json={"value": "77"})
+    assert without.status_code == 403
+    assert "X-CSRF-Token" in without.json()["error"]["message"]
+
+    with_header = client.put(
+        "/api/v1/admin/settings/base_cpm",
+        json={"value": "77"},
+        headers={"X-CSRF-Token": signed_in_admin},
+    )
+    assert with_header.status_code == 200
+
+
+def test_a_wrong_csrf_header_is_refused(client, signed_in_admin):
+    response = client.put(
+        "/api/v1/admin/settings/base_cpm",
+        json={"value": "77"},
+        headers={"X-CSRF-Token": "not-the-right-token"},
+    )
+    assert response.status_code == 403
+
+
+def test_moderator_cannot_reach_admin_only_routes(client, db, make_staff):
+    from app.core.security import hash_password
+    from app.models.enums import Role
+
+    staff = make_staff(email="mod@example.com", role=Role.MODERATOR)
+    staff.password_hash = hash_password("correct-horse-battery")
+    db.commit()
+    client.post(
+        "/admin/login",
+        data={"email": "mod@example.com", "password": "correct-horse-battery"},
+        follow_redirects=False,
+    )
+    # A moderator may read the review queue…
+    assert client.get("/api/v1/admin/campaigns/queue").status_code == 200
+    # …but not the settings or the audit log.
+    assert client.get("/api/v1/admin/settings").status_code == 403
+    assert client.get("/api/v1/admin/audit").status_code == 403
+
+
+def test_a_deactivated_staff_session_stops_working(client, db, signed_in_admin, make_staff):
+    from app.models.identity import StaffUser
+    from sqlalchemy import select
+
+    staff = db.scalars(select(StaffUser).where(StaffUser.email == "apiadmin@example.com")).one()
+    staff.is_active = False
+    db.commit()
+    assert client.get("/api/v1/admin/overview").status_code == 401

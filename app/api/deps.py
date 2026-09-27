@@ -11,8 +11,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.cache import rate_limit
+from app.core.config import settings
 from app.core.errors import PermissionDenied, SuspendedAccount, Unauthenticated
-from app.core.security import unsign, verify_telegram_login
+from app.core.security import (
+    constant_time_equals,
+    unsign,
+    verify_telegram_login,
+)
 from app.db.session import get_session
 from app.models.enums import Role
 from app.models.identity import Advertiser, Publisher, StaffUser, User
@@ -68,12 +73,42 @@ def _bearer(authorization: str | None) -> str | None:
     return token.strip() if scheme.lower() == "bearer" and token.strip() else None
 
 
+def _staff_from_cookie(request: Request, db: Session) -> StaffUser | None:
+    """Recognise an admin dashboard session on the REST API.
+
+    The dashboard and the API are two front doors to the same service. Without
+    this bridge nothing could satisfy the staff dependencies at all, and the
+    dashboard's own export links would 401.
+    """
+    from app.admin.auth import SESSION_COOKIE, SESSION_SALT
+
+    token = request.cookies.get(SESSION_COOKIE)
+    if not token:
+        return None
+    payload = unsign(token, SESSION_SALT, settings.admin_session_max_age)
+    staff = db.get(StaffUser, uuid.UUID(payload["sid"]))
+    if staff is None or not staff.is_active:
+        raise Unauthenticated("this staff session is no longer valid")
+
+    # A cookie travels automatically, so a state-changing request authenticated by
+    # one needs the same CSRF proof the dashboard forms carry.
+    if request.method not in ("GET", "HEAD", "OPTIONS"):
+        submitted = request.headers.get("x-csrf-token", "")
+        expected = payload.get("csrf", "")
+        if not expected or not submitted or not constant_time_equals(submitted, expected):
+            raise PermissionDenied(
+                "an X-CSRF-Token header matching your session is required for this request"
+            )
+    return staff
+
+
 def current_principal(
+    request: Request,
     db: DbSession,
     authorization: Annotated[str | None, Header()] = None,
     x_telegram_init_data: Annotated[str | None, Header()] = None,
 ) -> Principal:
-    """Authenticate by session bearer token or by Telegram WebApp initData."""
+    """Authenticate by bearer token, Telegram initData, or a staff cookie."""
     token = _bearer(authorization)
     if token:
         payload = unsign(token, SESSION_SALT, SESSION_MAX_AGE)
@@ -98,6 +133,10 @@ def current_principal(
         if not user.is_active:
             raise SuspendedAccount(f"this account is {user.status.value}")
         return Principal(user=user)
+
+    staff = _staff_from_cookie(request, db)
+    if staff is not None:
+        return Principal(staff=staff)
 
     raise Unauthenticated("authentication required")
 
