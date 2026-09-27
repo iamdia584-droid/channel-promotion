@@ -53,6 +53,42 @@ def get_dispatcher() -> Dispatcher:
     return _dispatcher
 
 
+async def run_polling() -> None:
+    """Run the bot by long-polling Telegram instead of receiving webhooks.
+
+    Webhooks need a public HTTPS URL with a valid certificate, which means a server
+    and a domain. Polling needs neither, so this is the way to run the bot from a
+    laptop — for development, for a first trial, or as a fallback if the webhook
+    endpoint is ever unreachable.
+
+    Telegram refuses to deliver by both mechanisms at once, so any registered
+    webhook is removed first.
+    """
+    bot = get_bot()
+    dispatcher = get_dispatcher()
+
+    try:
+        await _polling_loop(bot, dispatcher)
+    finally:
+        # aiohttp warns about an unclosed session otherwise, which buries the real
+        # error behind noise.
+        await bot.session.close()
+
+
+async def _polling_loop(bot: Bot, dispatcher: Dispatcher) -> None:
+    await bot.delete_webhook(drop_pending_updates=False)
+    await set_commands()
+
+    me = await bot.get_me()
+    log.info("polling_started", bot=f"@{me.username}", bot_id=me.id)
+    print(f"Bot @{me.username} is live. Open https://t.me/{me.username} and send /start.")
+    print("Press Ctrl+C to stop.")
+
+    await dispatcher.start_polling(
+        bot, allowed_updates=["message", "callback_query", "my_chat_member", "chat_member"]
+    )
+
+
 async def set_webhook() -> str:
     """Register the webhook with Telegram, including the verification secret."""
     bot = get_bot()

@@ -90,6 +90,80 @@ def notify() -> int:
     return 0
 
 
+def run_bot() -> int:
+    """Run the bot by polling. No server, domain or certificate required."""
+    import asyncio
+
+    from app.core.config import settings
+
+    if not settings.telegram_bot_token:
+        print(
+            "TELEGRAM_BOT_TOKEN is not set.\n\n"
+            "Get one from @BotFather on Telegram (send /newbot), then put it in .env:\n"
+            "  TELEGRAM_BOT_TOKEN=123456:AA...\n"
+        )
+        return 2
+
+    from app.bot.dispatcher import run_polling
+
+    try:
+        asyncio.run(run_polling())
+    except KeyboardInterrupt:
+        print("\nBot stopped.")
+        return 0
+    except Exception as exc:  # a CLI must explain itself, not print a traceback
+        print(f"\nThe bot could not start: {_explain(exc)}")
+        return 1
+    return 0
+
+
+def _explain(exc: Exception) -> str:
+    """Turn a network or API failure into something the operator can act on."""
+    name = type(exc).__name__
+    message = str(exc)
+
+    if "Unauthorized" in name or "401" in message:
+        return (
+            "Telegram rejected the token.\n"
+            "  Check TELEGRAM_BOT_TOKEN in .env matches what @BotFather gave you.\n"
+            "  It looks like 123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw"
+        )
+    if "Conflict" in name or "terminated by other getUpdates" in message:
+        return (
+            "another process is already polling with this token.\n"
+            "  Stop the other one, or you are running both webhook and polling mode."
+        )
+    haystack = f"{name} {message}"
+    if "CERTIFICATE_VERIFY_FAILED" in haystack or "CertificateError" in haystack:
+        return (
+            "the TLS certificate for api.telegram.org could not be verified.\n"
+            "  This usually means a proxy is intercepting HTTPS. Run the bot from a\n"
+            "  network without an intercepting proxy, or install that proxy's CA\n"
+            "  certificate on this machine."
+        )
+    if any(
+        hint in haystack
+        for hint in (
+            "NetworkError",
+            "ClientConnector",
+            "ServerTimeout",
+            "TimeoutError",
+            "Cannot connect",
+            "SSL",
+        )
+    ):
+        return (
+            "could not reach api.telegram.org.\n"
+            "  Check your internet connection. If you are behind a firewall, Telegram\n"
+            "  may be blocked — try a different network or a VPN."
+        )
+    if "OperationalError" in name or "could not connect to server" in message:
+        return (
+            "could not reach the database.\n  Check DATABASE_URL, and that PostgreSQL is running."
+        )
+    return f"{name}: {message}"
+
+
 def set_webhook() -> int:
     import asyncio
 
@@ -206,6 +280,7 @@ def seed_demo() -> int:
 
 COMMANDS = {
     "bootstrap": bootstrap,
+    "run-bot": run_bot,
     "serve": serve,
     "settle": settle,
     "confirm": confirm,

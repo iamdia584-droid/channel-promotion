@@ -24,6 +24,27 @@ You need four things:
 
 ---
 
+## Quickest possible start: no server, no domain
+
+Before renting anything, run the bot from your own computer. Telegram webhooks need
+a public HTTPS URL, but **polling does not** — so this works on a laptop:
+
+```bash
+cp .env.example .env
+# put your @BotFather token in TELEGRAM_BOT_TOKEN, and set SECRET_KEY
+docker compose up -d db redis          # or use your own Postgres/Redis
+alembic upgrade head
+python -m app.workers.cli bootstrap
+python -m app.workers.cli run-bot      # the bot is now live
+```
+
+Open the bot in Telegram and send `/start`. It answers immediately.
+
+Polling is for trying the system and for development. Once you want it running
+24/7 without your laptop on, move to a server and switch to webhooks below.
+
+---
+
 ## Path A — Docker Compose
 
 ```bash
