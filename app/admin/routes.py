@@ -716,6 +716,122 @@ def reject_refund_ui(
         return _redirect("/admin/refunds", "Refund rejected")
 
 
+@router.get("/reports", response_class=HTMLResponse)
+def reports_page(request: Request):
+    with session_scope() as db:
+        try:
+            staff = _guard(request, db)
+        except AdNetError:
+            return RedirectResponse("/admin/login", status_code=303)
+        from app.services.moderation import ModerationService
+
+        service = ModerationService(db)
+        rows = []
+        for r in service.all_reports(100):
+            rows.append(
+                {
+                    "id": r.id,
+                    "when": r.created_at.strftime("%d %b %H:%M"),
+                    "target": r.target_type.value,
+                    "target_id": str(r.target_id)[:8],
+                    "reason": r.reason.value,
+                    "reason_kind": "bad"
+                    if r.reason.value in {"scam", "malware", "adult", "illegal", "impersonation"}
+                    else "warn",
+                    "details": (r.details or "—")[:70],
+                    "status": r.status.value,
+                    "status_kind": _status_kind(r.status.value),
+                    "resolution": (r.resolution or "—")[:50],
+                    "actionable": r.status.value in {"open", "reviewing"},
+                }
+            )
+        return TEMPLATES.TemplateResponse(
+            request,
+            "table.html",
+            _ctx(
+                request,
+                db,
+                staff,
+                active="reports",
+                heading="Reports",
+                intro="A report is a signal from a person, never acted on "
+                "automatically. Upholding a severe reason suspends the "
+                "campaign or channel immediately.",
+                columns=[
+                    {"key": "when", "label": "Filed"},
+                    {"key": "target", "label": "Target"},
+                    {"key": "target_id", "label": "ID", "mono": True},
+                    {"key": "reason", "label": "Reason", "pill": True},
+                    {"key": "details", "label": "Details"},
+                    {"key": "status", "label": "Status", "pill": True},
+                    {"key": "resolution", "label": "Resolution"},
+                ],
+                actions=[
+                    {
+                        "label": "Uphold",
+                        "url": "/admin/reports/{id}/uphold",
+                        "style": "danger",
+                        "when": "actionable",
+                        "reason": "resolution",
+                    },
+                    {
+                        "label": "Dismiss",
+                        "url": "/admin/reports/{id}/dismiss",
+                        "style": "ghost",
+                        "when": "actionable",
+                        "reason": "resolution",
+                    },
+                ],
+                rows=rows,
+            ),
+        )
+
+
+@router.post("/reports/{report_id}/uphold")
+def uphold_report_ui(
+    request: Request, report_id: uuid.UUID, reason: str = Form(...), csrf: str = Form("")
+):
+    with session_scope() as db:
+        staff = _guard(request, db)
+        verify_csrf(request, csrf)
+        from app.models.ops import Report
+        from app.services.moderation import ModerationService
+
+        report = db.get(Report, report_id)
+        if report is None:
+            return _redirect("/admin/reports", "Report not found", "err")
+        try:
+            outcome = ModerationService(db).uphold(report, _actor(request, staff), reason)
+        except AdNetError as exc:
+            return _redirect("/admin/reports", exc.message, "err")
+        note = "Report upheld"
+        if outcome.campaign_suspended:
+            note += " — campaign suspended"
+        if outcome.channel_suspended:
+            note += " — channel suspended"
+        return _redirect("/admin/reports", note)
+
+
+@router.post("/reports/{report_id}/dismiss")
+def dismiss_report_ui(
+    request: Request, report_id: uuid.UUID, reason: str = Form(...), csrf: str = Form("")
+):
+    with session_scope() as db:
+        staff = _guard(request, db)
+        verify_csrf(request, csrf)
+        from app.models.ops import Report
+        from app.services.moderation import ModerationService
+
+        report = db.get(Report, report_id)
+        if report is None:
+            return _redirect("/admin/reports", "Report not found", "err")
+        try:
+            ModerationService(db).dismiss(report, _actor(request, staff), reason)
+        except AdNetError as exc:
+            return _redirect("/admin/reports", exc.message, "err")
+        return _redirect("/admin/reports", "Report dismissed")
+
+
 @router.get("/fraud", response_class=HTMLResponse)
 def fraud_page(request: Request):
     with session_scope() as db:

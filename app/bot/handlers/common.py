@@ -226,3 +226,26 @@ async def profile(message: Message, state: FSMContext) -> None:
             f"Joined: {user.created_at:%d %b %Y}"
         )
     await message.answer(text, reply_markup=menus.back_to("menu"))
+
+
+@router.message(Command("report"))
+async def report_command(message: Message, state: FSMContext) -> None:
+    """Point a user at the report flow (spec §19).
+
+    Reporting needs the id of the specific ad or channel, which a person reading a
+    channel post does not have to hand, so the bot routes them to support rather
+    than asking for a UUID.
+    """
+    with bot_session() as db:
+        handle = SettingsService(db).str_("support_username")
+    text = (
+        "<b>Report an advertisement</b>\n\n"
+        "Send us the channel name and roughly when you saw the ad, plus one of:\n"
+        "scam · malware · misleading · adult · illegal · spam · impersonation · "
+        "copyright\n\n"
+        "A moderator reviews every report. Severe reasons suspend the campaign "
+        "as soon as a moderator confirms them."
+    )
+    if handle:
+        text += f"\n\nSend it to @{handle.lstrip('@')}."
+    await message.answer(text, reply_markup=menus.back_to("menu"))

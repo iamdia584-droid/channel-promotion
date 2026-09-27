@@ -132,7 +132,7 @@ average views is worth a fraction of one with 50,000 members and 25,000 views, a
 |---|---|---|
 | Advertiser | Bot + REST | Fund a wallet, create and pace campaigns, target, view statistics, request refunds |
 | Publisher | Bot + REST | Register and verify channels, set acceptance rules and frequency caps, watch earnings, withdraw |
-| Moderator | Dashboard | Review campaigns, creatives and channels; handle reports; flag suspicious activity |
+| Moderator | Dashboard | Review campaigns, creatives and channels; work the report queue; escalate financial and fraud questions to an admin |
 | Admin | Dashboard | Everything above, plus payouts, pricing, settings, manual adjustments and the audit log |
 
 Channel ownership is **proven**, never trusted. Registering a channel requires two

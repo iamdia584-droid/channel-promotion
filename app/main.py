@@ -133,7 +133,7 @@ def _safe_errors(errors: list) -> list[dict]:
 # --- routes ---------------------------------------------------------------
 
 from app.admin.routes import router as admin_ui_router
-from app.api.v1 import admin, advertisers, auth, publishers, tracking
+from app.api.v1 import admin, advertisers, auth, publishers, reports, tracking
 from app.bot.webhook import router as webhook_router
 
 API_PREFIX = "/api/v1"
@@ -141,6 +141,7 @@ app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(advertisers.router, prefix=API_PREFIX)
 app.include_router(publishers.router, prefix=API_PREFIX)
 app.include_router(admin.router, prefix=API_PREFIX)
+app.include_router(reports.router, prefix=API_PREFIX)
 app.include_router(tracking.router)
 app.include_router(webhook_router)
 app.include_router(admin_ui_router)

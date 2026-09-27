@@ -86,6 +86,7 @@ COMMANDS = [
     ("profile", "Your account"),
     ("help", "Help"),
     ("support", "Contact support"),
+    ("report", "Report an advertisement"),
 ]
 
 
