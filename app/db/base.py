@@ -5,6 +5,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
+from decimal import Decimal
+
 from sqlalchemy import BigInteger, DateTime, MetaData, Numeric, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -122,23 +124,50 @@ class GUID(TypeDecorator):
 
 
 class MoneyType(TypeDecorator):
-    """NUMERIC(24,6) that always hands Python a quantized Decimal.
+    """Exact fixed-point money, on PostgreSQL and SQLite alike.
 
-    Going through this type means no code path can accidentally read a float back
-    out of the database.
+    On PostgreSQL this is ``NUMERIC(24, 6)`` and arithmetic is exact.
+
+    SQLite has no real NUMERIC type: it stores DECIMAL columns as IEEE floats, so
+    a CHECK constraint like ``gross_amount = net_amount + platform_commission``
+    is evaluated on inexact float arithmetic and fails for ordinary commission
+    rates. Since those CHECKs are a core money guarantee, testing against float
+    storage would be false confidence. So on SQLite we store the value as a
+    64-bit integer count of micro-units, which makes both storage and in-database
+    arithmetic exact. Python always sees a quantized ``Decimal`` either way.
+
+    64-bit micro-units cap out around 9.2 x 10^12 currency units, far above any
+    balance this system will hold.
     """
 
     impl = Numeric
     cache_ok = True
+    #: Micro-units: 10 ** SCALE.
+    MICRO = 10 ** SCALE
 
     def __init__(self) -> None:
         super().__init__(precision=24, scale=SCALE, asdecimal=True)
 
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "sqlite":
+            return dialect.type_descriptor(BigInteger())
+        return dialect.type_descriptor(Numeric(24, SCALE, asdecimal=True))
+
     def process_bind_param(self, value, dialect):
-        return None if value is None else q(value)
+        if value is None:
+            return None
+        quantized = q(value)
+        if dialect.name == "sqlite":
+            return int(quantized.scaleb(SCALE).to_integral_value())
+        return quantized
 
     def process_result_value(self, value, dialect):
-        return None if value is None else q(D(value))
+        if value is None:
+            return None
+        if dialect.name == "sqlite":
+            # int -> Decimal is exact; never route this through float.
+            return q(Decimal(int(value)).scaleb(-SCALE))
+        return q(D(value))
 
 
 Money = MoneyType

@@ -49,7 +49,6 @@ from app.models.money import LedgerAccount, LedgerEntry, LedgerTransaction
 NORMAL_SIDE: dict[AccountKind, EntryDirection] = {
     AccountKind.ADVERTISER_AVAILABLE: EntryDirection.CREDIT,
     AccountKind.ADVERTISER_RESERVED: EntryDirection.CREDIT,
-    AccountKind.ADVERTISER_SPENT: EntryDirection.DEBIT,
     AccountKind.PUBLISHER_PENDING: EntryDirection.CREDIT,
     AccountKind.PUBLISHER_CONFIRMED: EntryDirection.CREDIT,
     AccountKind.PUBLISHER_PAID: EntryDirection.DEBIT,
@@ -74,7 +73,6 @@ NON_NEGATIVE: frozenset[AccountKind] = frozenset(
 OWNER_FOR_KIND: dict[AccountKind, AccountOwnerType] = {
     AccountKind.ADVERTISER_AVAILABLE: AccountOwnerType.ADVERTISER,
     AccountKind.ADVERTISER_RESERVED: AccountOwnerType.ADVERTISER,
-    AccountKind.ADVERTISER_SPENT: AccountOwnerType.ADVERTISER,
     AccountKind.PUBLISHER_PENDING: AccountOwnerType.PUBLISHER,
     AccountKind.PUBLISHER_CONFIRMED: AccountOwnerType.PUBLISHER,
     AccountKind.PUBLISHER_PAID: AccountOwnerType.PUBLISHER,
@@ -158,12 +156,14 @@ class LedgerService:
             balance=ZERO,
             label=f"{kind}:{owner_id or 'platform'}",
         )
-        self.session.add(account)
         try:
-            # Flush now so a concurrent creator collides here rather than later.
-            self.session.flush()
+            # Flush inside a SAVEPOINT so a concurrent creator collides here, and
+            # losing that race costs only this insert rather than the caller's
+            # whole transaction.
+            with self.session.begin_nested():
+                self.session.add(account)
+                self.session.flush()
         except IntegrityError:
-            self.session.rollback()
             existing = self.session.scalars(stmt).one_or_none()
             if existing is None:  # pragma: no cover - only on a genuine DB fault
                 raise
@@ -297,11 +297,13 @@ class LedgerService:
 
         try:
             self.session.flush()
-        except IntegrityError as exc:
-            # Lost the race on the unique key — the other writer's post stands.
+        except IntegrityError:
+            # Lost the race on the unique idempotency key: the other writer's post
+            # stands and ours must leave no trace. Undo it to the savepoint the
+            # caller opened, then return the winner.
             self.session.rollback()
             winner = self.find_by_key(idempotency_key)
-            if winner is None:
+            if winner is None:  # pragma: no cover - a genuine constraint fault
                 raise
             return PostResult(winner, list(winner.entries), replayed=True)
         return PostResult(txn, entries, replayed=False)

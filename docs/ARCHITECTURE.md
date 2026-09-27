@@ -88,8 +88,7 @@ FRAUD_CLAWBACK         revenue    reversed earnings
 | Deposit confirmed | GATEWAY_CLEARING | ADVERTISER_AVAILABLE |
 | Campaign budget reserved | ADVERTISER_AVAILABLE | ADVERTISER_RESERVED |
 | Reservation released (pause/cancel) | ADVERTISER_RESERVED | ADVERTISER_AVAILABLE |
-| Settlement of an impression batch | ADVERTISER_RESERVED | ADVERTISER_SPENT |
-| … and simultaneously | ADVERTISER_SPENT | PUBLISHER_PENDING + PLATFORM_REVENUE |
+| Settlement of an impression batch | ADVERTISER_RESERVED | PUBLISHER_PENDING + PLATFORM_REVENUE |
 | Earnings confirmed | PUBLISHER_PENDING | PUBLISHER_CONFIRMED |
 | Earnings reversed (fraud) | PUBLISHER_PENDING | FRAUD_CLAWBACK |
 | Withdrawal requested | PUBLISHER_CONFIRMED | PAYOUT_CLEARING + PLATFORM_FEES |
@@ -97,8 +96,13 @@ FRAUD_CLAWBACK         revenue    reversed earnings
 | Withdrawal rejected | PAYOUT_CLEARING + PLATFORM_FEES | PUBLISHER_CONFIRMED |
 | Refund | ADVERTISER_RESERVED | ADVERTISER_AVAILABLE (or GATEWAY_CLEARING for cash-out) |
 
-Settlement is one atomic `post()` with four legs, so publisher earnings and
-platform revenue can never disagree with advertiser spend.
+Settlement is one atomic `post()`: the advertiser's reserved prepayment is
+earned (debit) and becomes, to the exact paisa, a liability to the publisher plus
+platform revenue (credits). Because it is a single balanced posting, publisher
+earnings and platform revenue can never disagree with what the advertiser was
+charged. Cumulative advertiser spend is the sum of their settlement postings
+rather than a separate account, which keeps the chart free of an account that
+would net to zero.
 
 ## Pricing engine (spec §7, §31)
 
@@ -172,3 +176,18 @@ Three independent mechanisms:
 3. `impressions.dedupe_key` UNIQUE — impressions.
 4. `Idempotency-Key` header support on all mutating API routes, backed by
    `idempotency_records`.
+
+## Running the tests
+
+```bash
+pytest                                    # SQLite, fast
+TEST_DATABASE_URL=postgresql+psycopg://... pytest   # the real thing
+```
+
+Both are meaningful. `MoneyType` stores micro-unit integers on SQLite precisely so
+that the money CHECK constraints (`gross_amount = net_amount + platform_commission`,
+`settled_amount <= reserved_amount`) are evaluated on exact arithmetic there too —
+SQLite has no NUMERIC type and would otherwise store these columns as IEEE floats,
+making those constraints fail for ordinary commission rates and, worse, making a
+passing suite meaningless. Run against PostgreSQL before shipping regardless: it is
+what production uses, and only it exercises `FOR UPDATE` row locking.

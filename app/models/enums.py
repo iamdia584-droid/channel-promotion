@@ -174,7 +174,6 @@ class ValidationStatus(StrEnum):
 class AccountKind(StrEnum):
     ADVERTISER_AVAILABLE = "advertiser_available"
     ADVERTISER_RESERVED = "advertiser_reserved"
-    ADVERTISER_SPENT = "advertiser_spent"
     PUBLISHER_PENDING = "publisher_pending"
     PUBLISHER_CONFIRMED = "publisher_confirmed"
     PUBLISHER_PAID = "publisher_paid"

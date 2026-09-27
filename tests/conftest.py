@@ -17,10 +17,26 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production")
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
-import pytest
-from sqlalchemy import create_engine, event
+import pytest  # noqa: E402  (must follow the env defaults above)
+
+#: Set ``TEST_DATABASE_URL`` to a PostgreSQL DSN to run the suite against the real
+#: database. Strongly preferred for the financial tests: SQLite has no NUMERIC
+#: type and stores DECIMAL columns as floats, so the CHECK constraints that
+#: enforce ``gross = net + commission`` and ``settled <= reserved`` are evaluated
+#: on inexact float arithmetic there. Those constraints are a core money
+#: guarantee, so verifying them on SQLite alone would be false confidence.
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "")
+ON_POSTGRES = TEST_DATABASE_URL.startswith("postgresql")
+
+requires_postgres = pytest.mark.skipif(
+    not ON_POSTGRES,
+    reason="needs PostgreSQL: SQLite stores NUMERIC as float and cannot enforce "
+           "exact-decimal CHECK constraints (set TEST_DATABASE_URL)",
+)
+
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import NullPool, StaticPool
 
 from app.core.money import D
 from app.db.base import utcnow
@@ -137,8 +153,31 @@ def fake_redis(monkeypatch):
 # --------------------------------------------------------------------------
 
 
+@pytest.fixture(scope="session")
+def _pg_engine():
+    """One PostgreSQL engine for the session; each test gets a clean schema."""
+    eng = create_engine(TEST_DATABASE_URL, poolclass=NullPool, future=True)
+    with eng.connect() as conn:
+        conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+        conn.execute(text("CREATE SCHEMA public"))
+        conn.commit()
+    Base.metadata.create_all(eng)
+    yield eng
+    eng.dispose()
+
+
 @pytest.fixture
-def engine():
+def engine(request):
+    if ON_POSTGRES:
+        eng = request.getfixturevalue("_pg_engine")
+        # Truncate rather than recreate: far faster, and it resets sequences.
+        tables = ", ".join(f'"{t.name}"' for t in reversed(Base.metadata.sorted_tables))
+        with eng.connect() as conn:
+            conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
+            conn.commit()
+        yield eng
+        return
+
     eng = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
@@ -297,6 +336,8 @@ def make_campaign(db, make_advertiser):
         countries: list | None = None,
         categories: list | None = None,
         languages: list | None = None,
+        excluded_categories: list | None = None,
+        audience_types: list | None = None,
         with_ad: bool = True,
         **kw,
     ) -> Campaign:
@@ -324,8 +365,8 @@ def make_campaign(db, make_advertiser):
                 countries=countries if countries is not None else ["BD"],
                 categories=categories if categories is not None else ["education"],
                 languages=languages if languages is not None else ["bn"],
-                excluded_categories=[],
-                audience_types=[],
+                excluded_categories=excluded_categories or [],
+                audience_types=audience_types or [],
             )
         )
         if with_ad:
@@ -341,5 +382,57 @@ def make_campaign(db, make_advertiser):
             )
         db.flush()
         return campaign
+
+    return _make
+
+
+@pytest.fixture
+def gateway_fixture():
+    from app.services.telegram_gateway import FakeTelegramGateway
+
+    return FakeTelegramGateway()
+
+
+@pytest.fixture
+def funded(db):
+    """Give an advertiser a funded wallet."""
+    from app.services.wallet import WalletService
+
+    def _fund(advertiser, amount="100000"):
+        WalletService(db).credit_deposit(
+            advertiser.id, amount, idempotency_key=f"fund:{advertiser.id}:{amount}"
+        )
+        return advertiser
+
+    return _fund
+
+
+@pytest.fixture
+def delivery_engine(db, gateway_fixture):
+    from app.services.delivery import DeliveryService
+
+    return DeliveryService(db, gateway_fixture)
+
+
+@pytest.fixture
+def sent_delivery(db, gateway_fixture, delivery_engine, make_campaign, make_channel, funded,
+                  make_advertiser):
+    """A campaign delivered into a channel, ready to receive impressions."""
+
+    def _make(*, bid_cpm="100", avg_views=20_000, budget="50000", commission="0.20", **kw):
+        from app.services.settings_service import SettingsService
+
+        s = SettingsService(db)
+        s.set("platform_commission_rate", commission)
+        s.set("quality_multiplier_floor", "1.0000")
+        s.set("quality_multiplier_ceiling", "1.0000")
+        advertiser = funded(make_advertiser(), "200000")
+        campaign = make_campaign(advertiser, bid_cpm=bid_cpm, total_budget=budget,
+                                 daily_budget=budget, **kw)
+        channel = make_channel(avg_views=avg_views)
+        gateway_fixture.register_chat(channel.telegram_chat_id, username="c1")
+        result = delivery_engine.deliver_to(channel)
+        assert result.delivery is not None, result.reason
+        return result.delivery, campaign, channel, advertiser
 
     return _make

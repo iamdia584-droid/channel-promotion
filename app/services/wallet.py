@@ -11,14 +11,14 @@ import uuid
 from dataclasses import dataclass
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings as app_settings
 from app.core.errors import InsufficientFunds, NotFound, ValidationFailed
 from app.core.money import ZERO, D, q
 from app.db.base import utcnow
-from app.models.enums import AccountKind, TransactionType
+from app.models.enums import AccountKind, TransactionStatus, TransactionType
 from app.models.identity import Advertiser, Publisher
 from app.models.money import LedgerTransaction, Wallet, WalletTransaction
 from app.services.ledger import LedgerService, credit, debit
@@ -363,10 +363,18 @@ class WalletService:
                 D(wallet.reserved_balance)
                 - self.ledger.balance(AccountKind.ADVERTISER_RESERVED, wallet.currency, owner)
             )
-            out["spent"] = q(
-                D(wallet.spent_total)
-                - self.ledger.balance(AccountKind.ADVERTISER_SPENT, wallet.currency, owner)
+            # There is no ADVERTISER_SPENT account: spend is recognised by
+            # debiting the advertiser's reservation. Cumulative spend is therefore
+            # the sum of their settlement postings.
+            settled = self.session.scalar(
+                select(func.coalesce(func.sum(LedgerTransaction.amount), 0)).where(
+                    LedgerTransaction.advertiser_id == owner,
+                    LedgerTransaction.transaction_type == TransactionType.SETTLEMENT,
+                    LedgerTransaction.status == TransactionStatus.POSTED,
+                    LedgerTransaction.currency == wallet.currency,
+                )
             )
+            out["spent"] = q(D(wallet.spent_total) - D(settled or 0))
         if wallet.publisher_id:
             owner = wallet.publisher_id
             out["pending"] = q(
