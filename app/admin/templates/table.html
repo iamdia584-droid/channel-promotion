@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{{ heading }}{% endblock %}
+{% block content %}
+{% if intro %}<p class="muted" style="margin-top:-8px">{{ intro }}</p>{% endif %}
+<div class="scroll">
+<table>
+  <tr>{% for col in columns %}<th class="{{ 'num' if col.num }}">{{ col.label }}</th>{% endfor %}
+    {% if actions %}<th>Actions</th>{% endif %}</tr>
+  {% for row in rows %}
+  <tr>
+    {% for col in columns %}
+    <td class="{{ 'num' if col.num }}">
+      {% set value = row.get(col.key) %}
+      {% if col.pill %}<span class="pill {{ row.get(col.key ~ '_kind', '') }}">{{ value }}</span>
+      {% elif col.mono %}<span class="mono">{{ value }}</span>
+      {% else %}{{ value if value is not none else '—' }}{% endif %}
+    </td>
+    {% endfor %}
+    {% if actions %}
+    <td><div class="row">
+      {% for action in actions %}
+        {% if not action.when or row.get(action.when) %}
+        <form method="post" action="{{ action.url.replace('{id}', row.id|string) }}" class="inline">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% if action.reason %}
+          <input type="text" name="reason" placeholder="{{ action.reason }}" required
+                 style="width:180px;display:inline-block">
+          {% endif %}
+          {% if action.field %}
+          <input type="text" name="{{ action.field }}" placeholder="{{ action.placeholder }}"
+                 required style="width:150px;display:inline-block">
+          {% endif %}
+          <button class="{{ action.style or 'ghost' }}">{{ action.label }}</button>
+        </form>
+        {% endif %}
+      {% endfor %}
+      {% if row.get('detail_url') %}<a href="{{ row.detail_url }}">Details</a>{% endif %}
+    </div></td>
+    {% endif %}
+  </tr>
+  {% else %}
+  <tr><td colspan="{{ columns|length + (1 if actions else 0) }}" class="muted">
+    Nothing here.</td></tr>
+  {% endfor %}
+</table>
+</div>
+{% if evidence_rows %}
+<h2 style="font-size:15px;margin:22px 0 10px">Evidence</h2>
+{% for row in evidence_rows %}
+<details>
+  <summary>{{ row.summary }}</summary>
+  <pre class="mono">{{ row.evidence }}</pre>
+</details>
+{% endfor %}
+{% endif %}
+{% if export_url %}
+<p class="muted" style="margin-top:18px;font-size:13px">
+  <a href="{{ export_url }}">Export CSV</a></p>
+{% endif %}
+{% endblock %}

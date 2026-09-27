@@ -11,20 +11,32 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
 
-_connect_args: dict = {}
-if settings.database_url.startswith("postgresql"):
-    # A runaway query must not hold a row lock on a wallet indefinitely.
-    _connect_args["options"] = f"-c statement_timeout={settings.db_statement_timeout_ms}"
+def build_engine(url: str | None = None) -> Engine:
+    """Create an engine, passing only options the chosen pool actually accepts.
 
-engine: Engine = create_engine(
-    settings.database_url,
-    pool_pre_ping=True,
-    pool_size=settings.db_pool_size,
-    max_overflow=settings.db_max_overflow,
-    pool_recycle=1800,
-    future=True,
-    connect_args=_connect_args,
-)
+    ``pool_size`` and ``max_overflow`` belong to QueuePool. SQLite uses
+    SingletonThreadPool and raises TypeError if they are supplied, so a single
+    unconditional call would make the app unimportable against SQLite.
+    """
+    url = url or settings.database_url
+    kwargs: dict = {"pool_pre_ping": True, "future": True}
+    connect_args: dict = {}
+
+    if url.startswith("postgresql"):
+        # A runaway query must not hold a row lock on a wallet indefinitely.
+        connect_args["options"] = f"-c statement_timeout={settings.db_statement_timeout_ms}"
+        kwargs.update(
+            pool_size=settings.db_pool_size,
+            max_overflow=settings.db_max_overflow,
+            pool_recycle=1800,
+        )
+    elif url.startswith("sqlite"):
+        connect_args["check_same_thread"] = False
+
+    return create_engine(url, connect_args=connect_args, **kwargs)
+
+
+engine: Engine = build_engine()
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)
 

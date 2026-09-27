@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+{% if o.trial_balance.difference != '0.000000' %}
+<div class="flash err">
+  <b>Ledger imbalance: {{ o.trial_balance.difference }}</b> — debits do not equal
+  credits. This is a bug, not a business condition. Investigate before processing payouts.
+</div>
+{% endif %}
+
+<div class="cards">
+  <div class="card"><div class="label">Total ad spend</div>
+    <div class="value">{{ money(o.gross_ad_spend) }}</div>
+    <div class="sub">gross, settled</div></div>
+  <div class="card"><div class="label">Platform revenue</div>
+    <div class="value">{{ money(o.platform_revenue) }}</div>
+    <div class="sub">+ {{ money(o.platform_fees) }} withdrawal fees</div></div>
+  <div class="card"><div class="label">Publisher revenue</div>
+    <div class="value">{{ money(o.publisher_revenue) }}</div>
+    <div class="sub">{{ money(o.withdrawals_paid) }} paid out</div></div>
+  <div class="card"><div class="label">Active campaigns</div>
+    <div class="value">{{ o.active_campaigns }}</div>
+    <div class="sub">{{ o.campaigns_awaiting_review }} awaiting review</div></div>
+  <div class="card"><div class="label">Active publishers</div>
+    <div class="value">{{ o.active_publishers }}</div>
+    <div class="sub">{{ o.active_channels }} channels live</div></div>
+  <div class="card"><div class="label">Impressions today</div>
+    <div class="value">{{ '{:,}'.format(o.impressions_today) }}</div>
+    <div class="sub">{{ '{:,}'.format(o.total_billable_impressions) }} all time</div></div>
+  <div class="card"><div class="label">Clicks today</div>
+    <div class="value">{{ '{:,}'.format(o.clicks_today) }}</div>
+    <div class="sub">{{ '{:,}'.format(o.total_clicks) }} all time</div></div>
+  <div class="card"><div class="label">Pending withdrawals</div>
+    <div class="value">{{ money(o.pending_withdrawals_amount) }}</div>
+    <div class="sub">{{ o.pending_withdrawals_count }} awaiting action</div></div>
+</div>
+
+<h2 style="font-size:15px;margin:22px 0 10px">Daily financials</h2>
+<div class="scroll">
+<table>
+  <tr><th>Date</th><th class="num">Ad spend</th><th class="num">Publisher payout</th>
+      <th class="num">Platform revenue</th><th class="num">Refunds</th>
+      <th class="num">Impressions</th><th class="num">Clicks</th></tr>
+  {% for s in snapshots %}
+  <tr>
+    <td>{{ s.snapshot_date }}</td>
+    <td class="num">{{ money(s.gross_ad_spend) }}</td>
+    <td class="num">{{ money(s.publisher_payout) }}</td>
+    <td class="num">{{ money(s.platform_revenue) }}</td>
+    <td class="num">{{ money(s.refunds) }}</td>
+    <td class="num">{{ '{:,}'.format(s.billable_impressions) }}</td>
+    <td class="num">{{ '{:,}'.format(s.clicks) }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="7" class="muted">No snapshots yet. The nightly job builds these,
+    or run <span class="mono">python -m app.workers.cli snapshot</span>.</td></tr>
+  {% endfor %}
+</table>
+</div>
+
+<p class="muted" style="margin-top:18px;font-size:13px">
+  <a href="/api/v1/admin/reports/financial.csv">Export financial report (CSV)</a>
+</p>
+{% endblock %}

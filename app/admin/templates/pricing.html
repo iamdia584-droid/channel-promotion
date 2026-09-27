@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Pricing{% endblock %}
+{% block content %}
+<p class="muted" style="margin-top:-8px">
+  Multipliers applied on top of an advertiser's bid:
+  <span class="mono">effective_cpm = bid × country × category × format × size × quality</span>.
+  Rules are deactivated rather than deleted, so the price charged for a past
+  delivery stays reconstructible.
+</p>
+
+<div class="card" style="margin-bottom:20px">
+  <form method="post" action="/admin/pricing">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="row" style="align-items:flex-end;gap:14px">
+      <div><label>Scope</label>
+        <select name="scope" style="width:160px">
+          {% for s in scopes %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </select></div>
+      <div><label>Value</label>
+        <input name="scope_value" placeholder="BD / education / large" style="width:170px" required></div>
+      <div><label>Multiplier</label>
+        <input name="multiplier" value="1.0" style="width:110px" required></div>
+      <div><label>Commission override</label>
+        <input name="commission_rate_override" placeholder="0.30" style="width:130px"></div>
+      <div><label>Min CPM</label><input name="min_cpm" style="width:110px"></div>
+      <div><label>Max CPM</label><input name="max_cpm" style="width:110px"></div>
+      <div><button>Save rule</button></div>
+    </div>
+  </form>
+</div>
+
+<div class="scroll">
+<table>
+  <tr><th>Scope</th><th>Value</th><th class="num">Multiplier</th>
+      <th class="num">Commission</th><th class="num">Min CPM</th><th class="num">Max CPM</th>
+      <th>Active</th><th></th></tr>
+  {% for r in rules %}
+  <tr>
+    <td>{{ r.scope }}</td><td class="mono">{{ r.scope_value }}</td>
+    <td class="num">{{ r.multiplier }}</td>
+    <td class="num">{{ r.commission_rate_override or '—' }}</td>
+    <td class="num">{{ r.min_cpm or '—' }}</td>
+    <td class="num">{{ r.max_cpm or '—' }}</td>
+    <td><span class="pill {{ 'good' if r.active else '' }}">
+      {{ 'active' if r.active else 'inactive' }}</span></td>
+    <td>{% if r.active %}
+      <form method="post" action="/admin/pricing/{{ r.id }}/deactivate" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="ghost">Deactivate</button>
+      </form>{% endif %}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="8" class="muted">No rules yet — every bid is used as-is,
+    adjusted only by the channel quality band.</td></tr>
+  {% endfor %}
+</table>
+</div>
+{% endblock %}

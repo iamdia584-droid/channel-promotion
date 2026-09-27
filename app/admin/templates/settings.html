@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<p class="muted" style="margin-top:-8px">
+  Every pricing rate, fee, threshold and window the platform uses. Nothing here is
+  hard-coded in the application. Each change is written to the audit log.
+</p>
+{% for category, items in categories.items() %}
+<h2 style="font-size:15px;margin:22px 0 10px;text-transform:capitalize">{{ category }}</h2>
+<div class="scroll">
+<table>
+  <tr><th>Key</th><th>Value</th><th>Default</th><th>Description</th><th></th></tr>
+  {% for item in items %}
+  <tr>
+    <td class="mono">{{ item.key }}</td>
+    <td>
+      <form method="post" action="/admin/settings" class="row">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="key" value="{{ item.key }}">
+        <input type="text" name="value" value="{{ item.value }}" style="width:150px">
+        <button>Save</button>
+      </form>
+    </td>
+    <td class="mono muted">{{ item.default }}</td>
+    <td class="muted" style="font-size:13px">{{ item.description }}
+      {% if item.min is not none %}<br><span class="mono" style="font-size:11px">range
+        {{ item.min }}{% if item.max %}–{{ item.max }}{% endif %}</span>{% endif %}</td>
+    <td>{% if not item.is_default %}<span class="pill warn">changed</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+</div>
+{% endfor %}
+{% endblock %}

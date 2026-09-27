@@ -436,3 +436,52 @@ def sent_delivery(db, gateway_fixture, delivery_engine, make_campaign, make_chan
         return result.delivery, campaign, channel, advertiser
 
     return _make
+
+
+@pytest.fixture
+def client(engine, monkeypatch, fake_redis):
+    """FastAPI TestClient bound to the test database and a fake Telegram gateway."""
+    from fastapi.testclient import TestClient
+    from sqlalchemy.orm import sessionmaker
+
+    import app.db.session as session_mod
+    from app.services.telegram_gateway import FakeTelegramGateway, set_gateway
+
+    factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)
+    monkeypatch.setattr(session_mod, "engine", engine)
+    monkeypatch.setattr(session_mod, "SessionLocal", factory)
+
+    gateway = FakeTelegramGateway()
+    set_gateway(gateway)
+
+    from app.main import app as fastapi_app
+
+    with TestClient(fastapi_app) as test_client:
+        test_client.gateway = gateway
+        yield test_client
+    set_gateway(None)
+
+
+@pytest.fixture
+def api_token(db):
+    """Issue a signed API session for a user, creating roles as needed."""
+    from app.api.deps import issue_session_token
+
+    def _make(*, advertiser=False, publisher=False, telegram_user_id=None):
+        from app.api.v1.auth import ensure_advertiser, ensure_publisher
+        from app.models.identity import User
+
+        user = User(
+            telegram_user_id=telegram_user_id or next(_tg_id),
+            first_name="API", username="apiuser",
+        )
+        db.add(user)
+        db.flush()
+        if advertiser:
+            ensure_advertiser(db, user)
+        if publisher:
+            ensure_publisher(db, user)
+        db.commit()
+        return issue_session_token(user), user
+
+    return _make
